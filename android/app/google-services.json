@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "914020003424",
+    "project_id": "tanki-bhai-app",
+    "storage_bucket": "tanki-bhai-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:914020003424:android:c79ea227e7d9615d419d05",
+        "android_client_info": {
+          "package_name": "com.example.mileage_calculator"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "914020003424-1h945h31nvtha22r5uhaaifdlslih9h9.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.mileage_calculator",
+            "certificate_hash": "aa93e10915115ce4e650a72918c55780a84a6c43"
+          }
+        },
+        {
+          "client_id": "914020003424-g0rkuv70uo5oe236k6rmeofml71nuhog.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBq7jK_hwE9PTTiOwXwq_EpXAigUkecTHc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "914020003424-g0rkuv70uo5oe236k6rmeofml71nuhog.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "914020003424-bq74pguaeubo3e563u2pfvmrf9ve9dru.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.mileageCalculator"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
