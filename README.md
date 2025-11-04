@@ -1,6 +1,6 @@
-# TankiBhai - Fuel Tracker App 
+# FuelBhai - Smart Fuel Tracker 
  
-**TankiBhai (Beta)** is a clean, efficient, and intuitive fuel tracking application designed to help users monitor fuel consumption, mileage, and fuel expenses with ease.  
+**FuelBhai (Beta)** is a clean, efficient, and intuitive fuel tracking application designed to help users monitor fuel consumption, mileage, and fuel expenses with ease.  
 
 ---
 
@@ -50,7 +50,7 @@ These insights help users track performance trends and manage fuel costs effecti
 
 ## Security & Data Privacy
 
-TankiBhai is built with performance and privacy in mind. No personal or sensitive user data is collected or shared.
+FuelBhai is built with performance and privacy in mind. No personal or sensitive user data is collected or shared.
 
 ---
 
