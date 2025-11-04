@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:mileage_calculator/controllers/mileage_controller.dart';
+import 'package:mileage_calculator/screens/notification_screen.dart';
 import 'package:mileage_calculator/utils/theme.dart';
 import 'package:mileage_calculator/widgets/empty_history_placeholder.dart';
 import 'package:mileage_calculator/widgets/fuel_entry_list.dart';
@@ -232,7 +233,7 @@ class HomePage extends StatelessWidget {
                 ),
                 child: IconButton(
                   onPressed: () {
-                    Get.offAll(() => const MainNavigation(initialIndex: 3));
+                    Get.to(() => const NotificationScreen());
                   },
                   icon: Stack(
                     children: [
