@@ -30,15 +30,20 @@ class FuelingService extends GetxController {
       print('✅ New AuthService created');
     }
 
-    // Load offline data first
-    print('💾 Loading offline data...');
-    _loadOfflineData();
+    // Don't load offline data on init - it may contain other users' data
+    // Data will be loaded via auth state listener when user logs in
+    print(
+      '⏸️ Skipping offline data load on init to prevent cross-user contamination',
+    );
 
     if (_authService.isLoggedIn.value) {
       print('👤 User is logged in, fetching Firebase records');
+      // Clear any existing data first
+      fuelingRecords.clear();
       fetchFuelingRecords();
     } else {
-      print('👤 User not logged in, skipping Firebase fetch');
+      print('👤 User not logged in, ensuring empty state');
+      fuelingRecords.clear();
     }
 
     // Listen for auth state changes to refresh records
@@ -46,20 +51,31 @@ class FuelingService extends GetxController {
     _authService.isLoggedIn.listen((isLoggedIn) {
       print('🔄 Auth state changed: isLoggedIn = $isLoggedIn');
       if (isLoggedIn) {
-        print('✅ User logged in, will sync data from Firebase');
-        // Reduced delay to ensure auth state is stable but faster sync
-        Future.delayed(const Duration(milliseconds: 800), () {
-          if (_authService.isLoggedIn.value) {
-            print('📥 Delayed sync: fetching records from Firebase');
-            fetchFuelingRecords();
-            _processPendingOperations();
+        print(
+          '✅ User logged in, clearing old data and fetching fresh from Firebase',
+        );
+        // Clear any existing data first to prevent contamination
+        fuelingRecords.clear();
+        // Small delay to ensure auth state is fully stable
+        Future.delayed(const Duration(milliseconds: 300), () {
+          if (_authService.isLoggedIn.value &&
+              _authService.user.value != null) {
+            print(
+              '📥 Auth listener: fetching records from Firebase for user: ${_authService.user.value!.uid}',
+            );
+            fetchFuelingRecords().then((_) {
+              print(
+                '✅ Auth listener: Fetch completed, records count: ${fuelingRecords.length}',
+              );
+              _processPendingOperations();
+            });
           }
         });
       } else {
         print('❌ User logged out, clearing all data');
-        _clearAllLocalData();
         fuelingRecords.clear();
         pendingOperations.clear();
+        _clearAllLocalData();
       }
     });
 
@@ -69,6 +85,15 @@ class FuelingService extends GetxController {
   Future<void> _loadOfflineData() async {
     print('💾 Loading offline data...');
     try {
+      // Only load offline data if user is logged in
+      if (!_authService.isLoggedIn.value || _authService.user.value == null) {
+        print('⚠️ User not logged in, skipping offline data load');
+        return;
+      }
+
+      final currentUserId = _authService.user.value!.uid;
+      print('👤 Loading offline data for user: $currentUserId');
+
       final prefs = await SharedPreferences.getInstance();
       final offlineData = prefs.getStringList('offline_fueling_records') ?? [];
       print('📊 Found ${offlineData.length} offline records');
@@ -76,25 +101,17 @@ class FuelingService extends GetxController {
       if (offlineData.isNotEmpty) {
         final records =
             offlineData.map((jsonStr) {
-              print('📄 Processing offline record: $jsonStr');
               final jsonData = json.decode(jsonStr);
-              return FuelingRecord.fromJson(
-                jsonData,
-              ); // Use fromJson instead of fromMap
+              return FuelingRecord.fromJson(jsonData);
             }).toList();
 
-        // Filter records for current user if logged in
-        List<FuelingRecord> userSpecificRecords = records;
-        if (_authService.isLoggedIn.value && _authService.user.value != null) {
-          final currentUserId = _authService.user.value!.uid;
-          userSpecificRecords =
-              records
-                  .where((record) => record.userId == currentUserId)
-                  .toList();
-          print(
-            '🔍 Filtered to ${userSpecificRecords.length} records for user: $currentUserId',
-          );
-        }
+        // CRITICAL: Filter records for current user ONLY
+        final userSpecificRecords =
+            records.where((record) => record.userId == currentUserId).toList();
+
+        print(
+          '🔍 Filtered to ${userSpecificRecords.length} records for user: $currentUserId (from ${records.length} total)',
+        );
 
         fuelingRecords.value = userSpecificRecords;
         print('✅ Loaded ${userSpecificRecords.length} offline records');
@@ -272,6 +289,12 @@ class FuelingService extends GetxController {
     }
   }
 
+  // Public method for explicit sync calls (bypasses auth listener delay)
+  Future<void> forceFetchFuelingRecords() async {
+    print('⚡ FuelingService: Force fetching records (explicit call)');
+    return fetchFuelingRecords();
+  }
+
   Future<void> fetchFuelingRecords() async {
     print('🔄 FuelingService: Starting fetchFuelingRecords');
 
@@ -284,6 +307,7 @@ class FuelingService extends GetxController {
 
       if (userId.isEmpty) {
         print('❌ User ID is empty, returning');
+        isLoading.value = false;
         return;
       }
 
@@ -335,15 +359,19 @@ class FuelingService extends GetxController {
       print(
         '✅ Converted ${records.length} user-specific documents to FuelingRecord objects',
       );
+
+      // Update reactive list
       fuelingRecords.value = records;
+      print('📊 fuelingRecords updated with ${fuelingRecords.length} records');
 
       // Force notify reactive listeners
       fuelingRecords.refresh();
+      print('🔔 Reactive listeners notified');
 
-      // Save to offline storage
-      print('💾 Saving to offline storage...');
+      // Save to offline storage (local cache)
+      print('💾 Saving ${records.length} records to offline storage...');
       await _saveOfflineData();
-      print('✅ Offline save completed');
+      print('✅ Offline save completed - data cached locally');
 
       isOnline.value = true;
       print('🌐 Online status set to true');
@@ -587,27 +615,44 @@ class FuelingService extends GetxController {
   Future<void> syncFromFirebaseToOffline() async {
     print('🔄 FuelingService: Starting Firebase to offline sync...');
 
-    if (!_authService.isLoggedIn.value) {
+    if (!_authService.isLoggedIn.value || _authService.user.value == null) {
       print('❌ User not logged in, skipping sync');
+      fuelingRecords.clear();
       return;
     }
 
+    final currentUserId = _authService.user.value!.uid;
+    print('👤 Syncing for user: $currentUserId');
+
     try {
-      print('🧹 Clearing existing offline data...');
+      print('🧹 Clearing existing data completely...');
+      fuelingRecords.clear();
       await _clearOfflineDataOnly();
 
-      print('📥 Fetching fresh data from Firebase...');
+      print('📥 Fetching fresh data from Firebase for current user...');
       await fetchFuelingRecords();
+
+      // Verify all records belong to current user
+      final wrongUserRecords =
+          fuelingRecords.where((r) => r.userId != currentUserId).length;
+      if (wrongUserRecords > 0) {
+        print(
+          '⚠️ WARNING: Found $wrongUserRecords records from other users - removing...',
+        );
+        fuelingRecords.removeWhere((r) => r.userId != currentUserId);
+      }
 
       // Force notify any listening controllers
       print('🔄 Triggering reactive updates...');
       fuelingRecords.refresh();
 
-      print('✅ Firebase to offline sync completed successfully');
+      print(
+        '✅ Firebase to offline sync completed successfully with ${fuelingRecords.length} records',
+      );
     } catch (e) {
       print('❌ Error during Firebase to offline sync: $e');
-      // Load any existing offline data as fallback
-      await _loadOfflineData();
+      // Don't load offline data as fallback - keep it clean
+      fuelingRecords.clear();
     }
   }
 

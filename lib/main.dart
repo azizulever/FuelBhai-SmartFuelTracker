@@ -6,6 +6,7 @@ import 'package:mileage_calculator/screens/onboarding_screen.dart';
 import 'package:mileage_calculator/screens/splash_screen.dart';
 import 'package:mileage_calculator/services/auth_service.dart';
 import 'package:mileage_calculator/services/fueling_service.dart';
+import 'package:mileage_calculator/services/service_trip_sync.dart';
 import 'package:mileage_calculator/utils/theme.dart';
 import 'package:mileage_calculator/widgets/main_navigation.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -19,6 +20,7 @@ void main() async {
   // Initialize services
   Get.put(AuthService());
   Get.put(FuelingService());
+  Get.put(ServiceTripSyncService());
 
   runApp(const MileageCalculatorApp());
 }

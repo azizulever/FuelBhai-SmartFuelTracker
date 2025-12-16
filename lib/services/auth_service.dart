@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:mileage_calculator/controllers/mileage_controller.dart';
 import 'package:mileage_calculator/services/fueling_service.dart';
+import 'package:mileage_calculator/services/service_trip_sync.dart';
 import 'package:mileage_calculator/utils/theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -197,6 +198,9 @@ class AuthService extends GetxController {
 
   Future<String> signInWithGoogle() async {
     try {
+      // Sign out first to ensure clean state
+      await GoogleSignIn().signOut();
+
       final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
 
       if (googleUser == null) {
@@ -206,13 +210,18 @@ class AuthService extends GetxController {
       final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
 
-      // Fix the accessToken reference
+      // Create credential with proper tokens
       final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.idToken, // Changed from accessToken to idToken
+        accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
       await FirebaseAuth.instance.signInWithCredential(credential);
+
+      // Save user data locally
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user_email', googleUser.email);
+      await prefs.setString('user_name', googleUser.displayName ?? 'User');
 
       // Trigger data sync after successful login
       await _syncDataAfterLogin();
@@ -249,9 +258,22 @@ class AuthService extends GetxController {
       return 'FirebaseAuthException: ${e.message}';
     } on Exception catch (e) {
       print('Exception: $e');
+
+      // Check for specific Google Sign-In errors
+      String errorMessage = 'An unexpected error occurred';
+      if (e.toString().contains('sign_in_failed') ||
+          e.toString().contains('ApiException: 10')) {
+        errorMessage =
+            'Google Sign-In is not properly configured.\n\n'
+            'Please ensure:\n'
+            '1. SHA-1 fingerprint is added to Firebase Console\n'
+            '2. Google Sign-In is enabled in Firebase Authentication\n'
+            '3. App is properly registered in Google Cloud Console';
+      }
+
       Get.snackbar(
         'Error',
-        'An unexpected error occurred: $e',
+        errorMessage,
         backgroundColor: Colors.red,
         colorText: Colors.white,
         borderRadius: 12,
@@ -259,7 +281,7 @@ class AuthService extends GetxController {
         snackPosition: SnackPosition.TOP,
         icon: const Icon(Icons.error, color: Colors.white),
         shouldIconPulse: false,
-        duration: const Duration(seconds: 3),
+        duration: const Duration(seconds: 5),
       );
       return 'Exception: $e';
     }
@@ -390,12 +412,20 @@ class AuthService extends GetxController {
         print('⚠️ Could not clear fueling data: $e');
       }
 
+      // Clear Service and Trip data
+      try {
+        final serviceTripSync = Get.find<ServiceTripSyncService>();
+        await serviceTripSync.clearAllLocalData();
+        print('✅ Service and Trip data cleared');
+      } catch (e) {
+        print('⚠️ Could not clear service/trip data: $e');
+      }
+
       // Sign out from Firebase
       await _auth.signOut();
 
       // Sign out from Google if signed in with Google
       if (await _googleSignIn.isSignedIn()) {
-        // Corrected to use isSignedIn() method
         await _googleSignIn.signOut();
       }
 
@@ -446,23 +476,46 @@ class AuthService extends GetxController {
       // Wait a moment to ensure auth state is fully updated
       await Future.delayed(const Duration(milliseconds: 200));
 
-      // Get FuelingService and trigger sync
+      // Clear any cached local data to ensure fresh start - but preserve offline records temporarily
+      final prefs = await SharedPreferences.getInstance();
+      print('🗑️ Clearing cached Service and Trip records...');
+      await prefs.remove('service_records');
+      await prefs.remove('trip_records');
+      // Don't clear fuel_entries or offline_fueling_records here - let FuelingService handle it
+
+      // Get FuelingService and trigger immediate sync
       final fuelingService = Get.find<FuelingService>();
 
-      print('📥 Syncing fueling records from Firebase to offline storage...');
+      print(
+        '📥 Explicitly syncing fueling records from Firebase (bypassing delays)...',
+      );
       await fuelingService.syncFromFirebaseToOffline();
+      print(
+        '📊 After sync: ${fuelingService.fuelingRecords.length} fueling records loaded',
+      );
 
-      // Process any pending operations that were stored offline
+      // Process any pending operations
       if (fuelingService.hasPendingOperations) {
-        print('📤 Processing pending operations...');
+        print('📤 Processing pending fueling operations...');
         await fuelingService.syncPendingData();
+      }
+
+      // Sync Service and Trip records from Firebase
+      try {
+        final serviceTripSync = Get.find<ServiceTripSyncService>();
+        print('📥 Syncing service and trip records from Firebase...');
+        await serviceTripSync.syncFromFirebase();
+        print('✅ Service and Trip records synced successfully');
+      } catch (e) {
+        print(
+          '⚠️ ServiceTripSyncService not found, will be initialized when needed: $e',
+        );
       }
 
       // Force refresh MileageController if it exists
       try {
         print('🔄 Refreshing MileageController...');
         final mileageController = Get.find<MileageGetxController>();
-        // Reduced delay for faster sync
         await Future.delayed(const Duration(milliseconds: 100));
         mileageController.update();
         print('✅ MileageController refreshed');
@@ -484,16 +537,24 @@ class AuthService extends GetxController {
 
         if (userRecords == totalRecords) {
           print(
-            '✅ Data validation passed: All $totalRecords records belong to current user',
+            '✅ Data validation passed: All $totalRecords fueling records belong to current user',
           );
         } else {
           print(
-            '⚠️ Data validation warning: $userRecords/$totalRecords records belong to current user',
+            '⚠️ Data validation warning: $userRecords/$totalRecords fueling records belong to current user',
+          );
+          // Clear mismatched data
+          fuelingService.fuelingRecords.removeWhere(
+            (record) => record.userId != currentUserId,
+          );
+          print(
+            '🧹 Removed ${totalRecords - userRecords} records from other users',
           );
         }
       }
 
       print('✅ Data sync completed successfully');
+      print('ℹ️ All user data synced from Firebase');
     } catch (e) {
       print('❌ Error during data sync after login: $e');
       // Don't rethrow - login should still succeed even if sync fails

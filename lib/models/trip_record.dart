@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class TripCostEntry {
   final String id;
   final double amount;
@@ -32,6 +34,7 @@ class TripCostEntry {
 
 class TripRecord {
   final String id;
+  final String userId;
   final DateTime startTime;
   final DateTime? endTime;
   final Duration duration;
@@ -41,6 +44,7 @@ class TripRecord {
 
   TripRecord({
     required this.id,
+    required this.userId,
     required this.startTime,
     this.endTime,
     required this.duration,
@@ -53,9 +57,24 @@ class TripRecord {
     return costEntries.fold(0.0, (sum, entry) => sum + entry.amount);
   }
 
+  // For Firebase storage
+  Map<String, dynamic> toMap() {
+    return {
+      'userId': userId,
+      'startTime': Timestamp.fromDate(startTime),
+      'endTime': endTime != null ? Timestamp.fromDate(endTime!) : null,
+      'duration': duration.inSeconds,
+      'costEntries': costEntries.map((e) => e.toJson()).toList(),
+      'vehicleType': vehicleType,
+      'isActive': isActive,
+    };
+  }
+
+  // For local storage (JSON serializable)
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'userId': userId,
       'startTime': startTime.toIso8601String(),
       'endTime': endTime?.toIso8601String(),
       'duration': duration.inSeconds,
@@ -65,9 +84,31 @@ class TripRecord {
     };
   }
 
+  // From Firebase
+  factory TripRecord.fromMap(Map<String, dynamic> map, String documentId) {
+    return TripRecord(
+      id: documentId,
+      userId: map['userId'] ?? '',
+      startTime: (map['startTime'] as Timestamp).toDate(),
+      endTime:
+          map['endTime'] != null
+              ? (map['endTime'] as Timestamp).toDate()
+              : null,
+      duration: Duration(seconds: map['duration'] as int),
+      costEntries:
+          (map['costEntries'] as List)
+              .map((e) => TripCostEntry.fromJson(e as Map<String, dynamic>))
+              .toList(),
+      vehicleType: map['vehicleType'] as String,
+      isActive: map['isActive'] as bool,
+    );
+  }
+
+  // From local storage (JSON)
   factory TripRecord.fromJson(Map<String, dynamic> json) {
     return TripRecord(
       id: json['id'] as String,
+      userId: json['userId'] ?? '',
       startTime: DateTime.parse(json['startTime'] as String),
       endTime:
           json['endTime'] != null

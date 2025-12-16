@@ -7,6 +7,7 @@ import 'package:mileage_calculator/models/service_record.dart';
 import 'package:mileage_calculator/models/trip_record.dart';
 import 'package:mileage_calculator/services/fueling_service.dart';
 import 'package:mileage_calculator/services/auth_service.dart';
+import 'package:mileage_calculator/services/service_trip_sync.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class MileageGetxController extends GetxController {
@@ -21,6 +22,7 @@ class MileageGetxController extends GetxController {
   // Services
   late final FuelingService _fuelingService;
   late final AuthService _authService;
+  late final ServiceTripSyncService _serviceTripSync;
 
   String get selectedVehicleType => _selectedVehicleType;
   List<String> get vehicleTypes => _vehicleTypes;
@@ -58,11 +60,30 @@ class MileageGetxController extends GetxController {
       print('✅ MileageController: Found existing AuthService');
     } catch (e) {
       print(
-        '⚠️ MileageController: AuthService not found, will be initialized by main',
+        '⚠️ MileageController: AuthService not found, creating new instance',
       );
       _authService = Get.put(AuthService());
       print('✅ MileageController: Created new AuthService');
     }
+
+    try {
+      _serviceTripSync = Get.find<ServiceTripSyncService>();
+      print('✅ MileageController: Found existing ServiceTripSyncService');
+    } catch (e) {
+      print(
+        '⚠️ MileageController: ServiceTripSyncService not found, creating new instance',
+      );
+      _serviceTripSync = Get.put(ServiceTripSyncService());
+      print('✅ MileageController: Created new ServiceTripSyncService');
+    }
+
+    // Listen to service and trip records from sync service
+    ever(_serviceTripSync.serviceRecords, (_) {
+      _updateServiceRecordsFromSync();
+    });
+    ever(_serviceTripSync.tripRecords, (_) {
+      _updateTripRecordsFromSync();
+    });
 
     // Listen for auth state changes
     _authService.isLoggedIn.listen((isLoggedIn) {
@@ -77,6 +98,25 @@ class MileageGetxController extends GetxController {
     });
   }
 
+  void _updateServiceRecordsFromSync() {
+    print('🔄 MileageController: Updating service records from sync service');
+    _serviceRecords.clear();
+    _serviceRecords.addAll(_serviceTripSync.serviceRecords);
+    update();
+  }
+
+  void _updateTripRecordsFromSync() {
+    print('🔄 MileageController: Updating trip records from sync service');
+    _tripRecords.clear();
+    _tripRecords.addAll(_serviceTripSync.tripRecords);
+    // Restore active trip if exists
+    _activeTrip = _tripRecords.firstWhereOrNull((trip) => trip.isActive);
+    if (_activeTrip != null) {
+      _startTripTimer();
+    }
+    update();
+  }
+
   Future<void> _loadSavedVehicleType() async {
     final prefs = await SharedPreferences.getInstance();
     _selectedVehicleType = prefs.getString('selected_vehicle_type') ?? 'Car';
@@ -89,14 +129,22 @@ class MileageGetxController extends GetxController {
   }
 
   Future<void> _loadFuelEntries() async {
-    final prefs = await SharedPreferences.getInstance();
-    final entriesJson = prefs.getStringList('fuel_entries') ?? [];
+    print('📥 MileageController: Loading fuel entries...');
 
+    // CRITICAL: Always clear fuel entries on init
+    // Never load from SharedPreferences - it may contain other users' data
+    // Data will be populated via _updateFromFuelingService after Firebase sync
     _fuelEntries.clear();
-    for (var entryJson in entriesJson) {
-      _fuelEntries.add(FuelEntry.fromJson(json.decode(entryJson)));
+
+    if (_authService.isLoggedIn.value && _authService.user.value != null) {
+      print(
+        '👤 User is logged in (${_authService.user.value!.uid}), will fetch from Firebase',
+      );
+      // Data will be loaded via _updateFromFuelingService after Firebase sync
+    } else {
+      print('ℹ️ User not logged in, keeping empty state');
     }
-    _fuelEntries.sort((a, b) => b.date.compareTo(a.date));
+
     update();
   }
 
@@ -107,53 +155,25 @@ class MileageGetxController extends GetxController {
 
     await prefs.setStringList('fuel_entries', entriesJson);
 
-    // Mark data as pending sync if user is logged in but offline
-    if (_authService.isLoggedIn.value) {
-      await _markPendingSync();
-    }
+    // Removed pending sync logic - all operations are now Firebase-first
   }
 
-  Future<void> _markPendingSync() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('has_pending_sync', true);
-    // Removed sync status indicator - syncing is now silent
-  }
-
-  Future<void> _clearPendingSync() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('has_pending_sync', false);
-    // Removed sync status indicator - syncing is now silent
-  }
+  // Removed _markPendingSync and _clearPendingSync as they're no longer needed
+  // All operations are now Firebase-first with automatic reactive updates
 
   Future<void> _syncWithFirebase() async {
-    // Removed sync status check - allow concurrent syncing for faster performance
+    print('🔄 MileageController: _syncWithFirebase called');
+    print('👤 User logged in: ${_authService.isLoggedIn.value}');
 
+    // Don't auto-sync local entries to Firebase to prevent creating unwanted data
+    // Only fetch data from Firebase that already exists for this user
     try {
-      // Silent sync - no UI indicators
-
-      // Convert local entries to fueling records and sync
-      final localRecords =
-          _fuelEntries
-              .map(
-                (entry) => {
-                  'date': entry.date.toIso8601String(),
-                  'liters': entry.fuelAmount,
-                  'cost': entry.fuelCost,
-                  'odometer': entry.odometer,
-                  'notes': 'Imported from local storage',
-                  'vehicleId': entry.vehicleType.toLowerCase(),
-                },
-              )
-              .toList();
-
-      await _fuelingService.syncLocalDataToFirebase(
-        localRecords,
-        'default-vehicle',
-      );
-      await _clearPendingSync();
+      print('📥 Fetching user-specific data from Firebase...');
+      await _fuelingService.fetchFuelingRecords();
+      await _serviceTripSync.syncFromFirebase();
+      print('✅ Firebase sync completed');
     } catch (e) {
-      print('Sync failed: $e');
-      // Silent failure - no UI notification
+      print('❌ Sync failed: $e');
     }
   }
 
@@ -162,15 +182,26 @@ class MileageGetxController extends GetxController {
     print('📊 Fueling records count: ${_fuelingService.fuelingRecords.length}');
     print('👤 User logged in: ${_authService.isLoggedIn.value}');
 
+    // Always clear fuel entries first to prevent showing stale data
+    _fuelEntries.clear();
+
     // Convert fueling records back to fuel entries for local display
     if (_fuelingService.fuelingRecords.isNotEmpty &&
         _authService.isLoggedIn.value) {
-      print(
-        '✅ Processing ${_fuelingService.fuelingRecords.length} fueling records',
-      );
-      _fuelEntries.clear();
+      final currentUserId = _authService.user.value?.uid ?? '';
+      print('👤 Current user ID: $currentUserId');
 
-      for (var record in _fuelingService.fuelingRecords) {
+      // Filter records to ensure only current user's data is shown
+      final userRecords =
+          _fuelingService.fuelingRecords
+              .where((record) => record.userId == currentUserId)
+              .toList();
+
+      print(
+        '✅ Processing ${userRecords.length} fueling records for current user (filtered from ${_fuelingService.fuelingRecords.length} total)',
+      );
+
+      for (var record in userRecords) {
         final fuelEntry = FuelEntry(
           id: record.id ?? '',
           date: record.date,
@@ -191,8 +222,13 @@ class MileageGetxController extends GetxController {
       _saveFuelEntries();
       update();
       print('🎉 UI updated with new fuel entries');
+    } else if (!_authService.isLoggedIn.value) {
+      print('ℹ️ User not logged in, clearing all data');
+      _saveFuelEntries();
+      update();
     } else {
-      print('ℹ️ No records to process or user not logged in');
+      print('ℹ️ No records to process');
+      update();
     }
   }
 
@@ -227,59 +263,33 @@ class MileageGetxController extends GetxController {
     String vehicleType,
     double fuelCost,
   ) async {
-    // Create the entry
-    final newEntry = FuelEntry(
-      date: date,
-      odometer: odometer,
-      fuelAmount: fuelAmount,
-      vehicleType: vehicleType,
-      fuelCost: fuelCost,
-    );
+    print('➕ MileageController: Adding fuel entry...');
 
-    _fuelEntries.insert(0, newEntry);
-    _fuelEntries.sort((a, b) => b.date.compareTo(a.date));
-
-    // Maintain max entries limit per vehicle type
-    final carEntries =
-        _fuelEntries.where((e) => e.vehicleType == 'Car').toList();
-    final bikeEntries =
-        _fuelEntries.where((e) => e.vehicleType == 'Bike').toList();
-
-    if (carEntries.length > _maxHistoryEntries) {
-      carEntries.sublist(_maxHistoryEntries).forEach((e) {
-        _fuelEntries.remove(e);
-      });
+    // Check if user is logged in
+    if (!_authService.isLoggedIn.value || _authService.user.value == null) {
+      print('❌ Cannot add fuel entry: User not logged in');
+      return;
     }
 
-    if (bikeEntries.length > _maxHistoryEntries) {
-      bikeEntries.sublist(_maxHistoryEntries).forEach((e) {
-        _fuelEntries.remove(e);
-      });
-    }
+    try {
+      final fuelingRecord = FuelingRecord(
+        userId: _authService.user.value!.uid,
+        date: date,
+        liters: fuelAmount,
+        cost: fuelCost,
+        odometer: odometer,
+        notes: 'Added from mobile app',
+        vehicleId: vehicleType.toLowerCase(),
+      );
 
-    // Save locally first (offline-first approach)
-    await _saveFuelEntries();
-    update();
+      print('📤 Adding to Firebase with userId: ${fuelingRecord.userId}');
+      await _fuelingService.addFuelingRecord(fuelingRecord);
+      print('✅ Fuel entry added successfully');
 
-    // Try to sync with Firebase if user is logged in
-    if (_authService.isLoggedIn.value) {
-      try {
-        final fuelingRecord = FuelingRecord(
-          userId: _authService.user.value!.uid,
-          date: date,
-          liters: fuelAmount,
-          cost: fuelCost,
-          odometer: odometer,
-          notes: 'Added from mobile app',
-          vehicleId: vehicleType.toLowerCase(),
-        );
-
-        await _fuelingService.addFuelingRecord(fuelingRecord);
-        await _clearPendingSync();
-      } catch (e) {
-        print('Failed to sync with Firebase: $e');
-        await _markPendingSync();
-      }
+      // The UI will update automatically via _updateFromFuelingService listener
+    } catch (e) {
+      print('❌ Failed to add fuel entry: $e');
+      throw e;
     }
   }
 
@@ -290,71 +300,62 @@ class MileageGetxController extends GetxController {
     double fuelAmount,
     double fuelCost,
   ) async {
+    print('🔄 MileageController: Updating fuel entry...');
+
+    if (!_authService.isLoggedIn.value || _authService.user.value == null) {
+      print('❌ Cannot update fuel entry: User not logged in');
+      return;
+    }
+
     final vehicleType = filteredEntries[index].vehicleType;
-    final originalIndex = _fuelEntries.indexOf(filteredEntries[index]);
     final originalEntry = filteredEntries[index];
 
-    if (originalIndex >= 0) {
-      final updatedEntry = FuelEntry(
-        id: originalEntry.id,
-        date: date,
-        odometer: odometer,
-        fuelAmount: fuelAmount,
-        vehicleType: vehicleType,
-        fuelCost: fuelCost,
-      );
+    if (originalEntry.id.isNotEmpty) {
+      try {
+        final fuelingRecord = FuelingRecord(
+          id: originalEntry.id,
+          userId: _authService.user.value!.uid,
+          date: date,
+          liters: fuelAmount,
+          cost: fuelCost,
+          odometer: odometer,
+          notes: 'Updated from mobile app',
+          vehicleId: vehicleType.toLowerCase(),
+        );
 
-      _fuelEntries[originalIndex] = updatedEntry;
-      _fuelEntries.sort((a, b) => b.date.compareTo(a.date));
+        print('📤 Updating in Firebase with userId: ${fuelingRecord.userId}');
+        await _fuelingService.updateFuelingRecord(fuelingRecord);
+        print('✅ Fuel entry updated successfully');
 
-      // Save locally first
-      await _saveFuelEntries();
-      update();
-
-      // Try to sync with Firebase if user is logged in
-      if (_authService.isLoggedIn.value && originalEntry.id.isNotEmpty) {
-        try {
-          final fuelingRecord = FuelingRecord(
-            id: originalEntry.id,
-            userId: _authService.user.value!.uid,
-            date: date,
-            liters: fuelAmount,
-            cost: fuelCost,
-            odometer: odometer,
-            notes: 'Updated from mobile app',
-            vehicleId: vehicleType.toLowerCase(),
-          );
-
-          await _fuelingService.updateFuelingRecord(fuelingRecord);
-          await _clearPendingSync();
-        } catch (e) {
-          print('Failed to sync update with Firebase: $e');
-          await _markPendingSync();
-        }
+        // The UI will update automatically via _updateFromFuelingService listener
+      } catch (e) {
+        print('❌ Failed to update fuel entry: $e');
+        throw e;
       }
     }
   }
 
   void deleteEntry(int index) async {
+    print('🗑️ MileageController: Deleting fuel entry...');
+
+    if (!_authService.isLoggedIn.value || _authService.user.value == null) {
+      print('❌ Cannot delete fuel entry: User not logged in');
+      return;
+    }
+
     final originalIndex = _fuelEntries.indexOf(filteredEntries[index]);
     final entryToDelete = filteredEntries[index];
 
-    if (originalIndex >= 0) {
-      _fuelEntries.removeAt(originalIndex);
+    if (originalIndex >= 0 && entryToDelete.id.isNotEmpty) {
+      try {
+        print('📤 Deleting from Firebase: ${entryToDelete.id}');
+        await _fuelingService.deleteFuelingRecord(entryToDelete.id);
+        print('✅ Fuel entry deleted successfully');
 
-      // Save locally first
-      await _saveFuelEntries();
-      update();
-
-      // Try to sync with Firebase if user is logged in
-      if (_authService.isLoggedIn.value && entryToDelete.id.isNotEmpty) {
-        try {
-          await _fuelingService.deleteFuelingRecord(entryToDelete.id);
-          await _clearPendingSync();
-        } catch (e) {
-          print('Failed to sync deletion with Firebase: $e');
-          await _markPendingSync();
-        }
+        // The UI will update automatically via _updateFromFuelingService listener
+      } catch (e) {
+        print('❌ Failed to delete fuel entry: $e');
+        throw e;
       }
     }
   }
@@ -545,33 +546,20 @@ class MileageGetxController extends GetxController {
     _fuelEntries.clear();
     _saveFuelEntries();
     _serviceRecords.clear();
-    _saveServiceRecords();
     _tripTimer?.cancel();
     _activeTrip = null;
     _tripRecords.clear();
-    _saveTripRecords();
     print('✅ Controller data cleared');
   }
 
   // Service Records Methods
   Future<void> _loadServiceRecords() async {
-    final prefs = await SharedPreferences.getInstance();
-    final recordsJson = prefs.getStringList('service_records') ?? [];
-
-    _serviceRecords.clear();
-    for (var recordJson in recordsJson) {
-      _serviceRecords.add(ServiceRecord.fromJson(json.decode(recordJson)));
+    // Load from sync service instead of SharedPreferences directly
+    if (_serviceTripSync.serviceRecords.isNotEmpty) {
+      _serviceRecords.clear();
+      _serviceRecords.addAll(_serviceTripSync.serviceRecords);
+      update();
     }
-    _serviceRecords.sort((a, b) => b.serviceDate.compareTo(a.serviceDate));
-    update();
-  }
-
-  Future<void> _saveServiceRecords() async {
-    final prefs = await SharedPreferences.getInstance();
-    final recordsJson =
-        _serviceRecords.map((record) => json.encode(record.toJson())).toList();
-
-    await prefs.setStringList('service_records', recordsJson);
   }
 
   void addServiceEntry(
@@ -580,9 +568,15 @@ class MileageGetxController extends GetxController {
     double totalCost,
     String serviceType,
     String vehicleType,
-  ) {
+  ) async {
+    if (_authService.user.value == null) {
+      print('❌ Cannot add service record: User not logged in');
+      return;
+    }
+
     final newRecord = ServiceRecord(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      id: '', // Will be assigned by Firebase
+      userId: _authService.user.value!.uid,
       serviceDate: serviceDate,
       odometerReading: odometerReading,
       totalCost: totalCost,
@@ -590,19 +584,21 @@ class MileageGetxController extends GetxController {
       vehicleType: vehicleType,
     );
 
-    _serviceRecords.add(newRecord);
-    _serviceRecords.sort((a, b) => b.serviceDate.compareTo(a.serviceDate));
-    _saveServiceRecords();
-    update();
-
-    print('✅ Service record added successfully');
+    try {
+      await _serviceTripSync.addServiceRecord(newRecord);
+      print('✅ Service record added successfully');
+    } catch (e) {
+      print('❌ Failed to add service record: $e');
+    }
   }
 
-  void deleteServiceRecord(String id) {
-    _serviceRecords.removeWhere((record) => record.id == id);
-    _saveServiceRecords();
-    update();
-    print('✅ Service record deleted');
+  void deleteServiceRecord(String id) async {
+    try {
+      await _serviceTripSync.deleteServiceRecord(id);
+      print('✅ Service record deleted');
+    } catch (e) {
+      print('❌ Failed to delete service record: $e');
+    }
   }
 
   List<ServiceRecord> get filteredServiceRecords {
@@ -636,33 +632,30 @@ class MileageGetxController extends GetxController {
   // ========== TRIP MANAGEMENT ==========
 
   Future<void> _loadTripRecords() async {
-    final prefs = await SharedPreferences.getInstance();
-    final tripRecordsJson = prefs.getStringList('trip_records') ?? [];
-    _tripRecords.clear();
-    for (final recordJson in tripRecordsJson) {
-      final trip = TripRecord.fromJson(json.decode(recordJson));
-      _tripRecords.add(trip);
-      if (trip.isActive) {
-        _activeTrip = trip;
+    // Load from sync service instead of SharedPreferences directly
+    if (_serviceTripSync.tripRecords.isNotEmpty) {
+      _tripRecords.clear();
+      _tripRecords.addAll(_serviceTripSync.tripRecords);
+      // Restore active trip if exists
+      _activeTrip = _tripRecords.firstWhereOrNull((trip) => trip.isActive);
+      if (_activeTrip != null) {
         _startTripTimer();
       }
+      update();
     }
-    _tripRecords.sort((a, b) => b.startTime.compareTo(a.startTime));
-    update();
   }
 
-  Future<void> _saveTripRecords() async {
-    final prefs = await SharedPreferences.getInstance();
-    final tripRecordsJson =
-        _tripRecords.map((record) => json.encode(record.toJson())).toList();
-    await prefs.setStringList('trip_records', tripRecordsJson);
-  }
-
-  void startTrip() {
+  void startTrip() async {
     if (_activeTrip != null) return;
+
+    if (_authService.user.value == null) {
+      print('❌ Cannot start trip: User not logged in');
+      return;
+    }
 
     final newTrip = TripRecord(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
+      userId: _authService.user.value!.uid,
       startTime: DateTime.now(),
       duration: Duration.zero,
       costEntries: [],
@@ -673,9 +666,14 @@ class MileageGetxController extends GetxController {
     _activeTrip = newTrip;
     _tripRecords.insert(0, newTrip);
     _startTripTimer();
-    _saveTripRecords();
+
+    try {
+      await _serviceTripSync.addTripRecord(newTrip);
+      print('✅ Trip started and synced to Firebase');
+    } catch (e) {
+      print('⚠️ Trip started locally, sync failed: $e');
+    }
     update();
-    print('✅ Trip started');
   }
 
   void _startTripTimer() {
@@ -685,6 +683,7 @@ class MileageGetxController extends GetxController {
         final elapsed = DateTime.now().difference(_activeTrip!.startTime);
         _activeTrip = TripRecord(
           id: _activeTrip!.id,
+          userId: _activeTrip!.userId,
           startTime: _activeTrip!.startTime,
           endTime: _activeTrip!.endTime,
           duration: elapsed,
@@ -697,7 +696,7 @@ class MileageGetxController extends GetxController {
     });
   }
 
-  void stopTrip() {
+  void stopTrip() async {
     if (_activeTrip == null) return;
 
     _tripTimer?.cancel();
@@ -708,6 +707,7 @@ class MileageGetxController extends GetxController {
 
     final completedTrip = TripRecord(
       id: _activeTrip!.id,
+      userId: _activeTrip!.userId,
       startTime: _activeTrip!.startTime,
       endTime: endTime,
       duration: finalDuration,
@@ -723,12 +723,17 @@ class MileageGetxController extends GetxController {
     }
 
     _activeTrip = null;
-    _saveTripRecords();
+
+    try {
+      await _serviceTripSync.updateTripRecord(completedTrip);
+      print('✅ Trip stopped and synced to Firebase');
+    } catch (e) {
+      print('⚠️ Trip stopped locally, sync failed: $e');
+    }
     update();
-    print('✅ Trip stopped');
   }
 
-  void addTripCost(double amount, String description) {
+  void addTripCost(double amount, String description) async {
     if (_activeTrip == null) return;
 
     final newCostEntry = TripCostEntry(
@@ -744,6 +749,7 @@ class MileageGetxController extends GetxController {
 
     _activeTrip = TripRecord(
       id: _activeTrip!.id,
+      userId: _activeTrip!.userId,
       startTime: _activeTrip!.startTime,
       endTime: _activeTrip!.endTime,
       duration: _activeTrip!.duration,
@@ -758,12 +764,16 @@ class MileageGetxController extends GetxController {
       _tripRecords[index] = _activeTrip!;
     }
 
-    _saveTripRecords();
+    try {
+      await _serviceTripSync.updateTripRecord(_activeTrip!);
+      print('✅ Trip cost added and synced: ৳$amount');
+    } catch (e) {
+      print('⚠️ Trip cost added locally, sync failed: $e');
+    }
     update();
-    print('✅ Trip cost added: ৳$amount');
   }
 
-  void deleteTripCostEntry(String costEntryId) {
+  void deleteTripCostEntry(String costEntryId) async {
     if (_activeTrip == null) return;
 
     final updatedCostEntries =
@@ -773,6 +783,7 @@ class MileageGetxController extends GetxController {
 
     _activeTrip = TripRecord(
       id: _activeTrip!.id,
+      userId: _activeTrip!.userId,
       startTime: _activeTrip!.startTime,
       endTime: _activeTrip!.endTime,
       duration: _activeTrip!.duration,
@@ -787,9 +798,22 @@ class MileageGetxController extends GetxController {
       _tripRecords[index] = _activeTrip!;
     }
 
-    _saveTripRecords();
+    try {
+      await _serviceTripSync.updateTripRecord(_activeTrip!);
+      print('✅ Trip cost entry deleted and synced');
+    } catch (e) {
+      print('⚠️ Trip cost entry deleted locally, sync failed: $e');
+    }
     update();
-    print('✅ Trip cost entry deleted');
+  }
+
+  void deleteTripRecord(TripRecord trip) async {
+    try {
+      await _serviceTripSync.deleteTripRecord(trip.id);
+      print('✅ Trip record deleted');
+    } catch (e) {
+      print('❌ Failed to delete trip record: $e');
+    }
   }
 
   List<TripRecord> get filteredTripRecords {
