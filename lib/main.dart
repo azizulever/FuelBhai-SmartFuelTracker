@@ -65,7 +65,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
     final skippedLogin = prefs.getBool('skipped_login') ?? false;
 
     // Initialize auth service and get current Firebase user
-    Get.put(AuthService());
+    final authService = Get.find<AuthService>();
     final currentUser = FirebaseAuth.instance.currentUser;
 
     // Determine which screen to show
@@ -89,6 +89,9 @@ class _AuthWrapperState extends State<AuthWrapper> {
       }
 
       if (skippedLogin && currentUser == null) {
+        // Guest mode - load local data
+        print('👤 Guest mode detected, loading local data...');
+        await _loadGuestDataOnStartup();
         _showDataWarningSnackbar();
       } else if (currentUser != null) {
         // User is logged in, trigger data sync
@@ -103,6 +106,25 @@ class _AuthWrapperState extends State<AuthWrapper> {
           _isLoading = false;
         });
       }
+    }
+  }
+
+  Future<void> _loadGuestDataOnStartup() async {
+    try {
+      print('📥 App startup: Loading guest data from local storage...');
+      final authService = Get.find<AuthService>();
+
+      // Ensure guest mode is enabled
+      if (!authService.isGuestMode.value) {
+        await authService.enableGuestMode();
+      }
+
+      // Add a small delay to ensure services are fully initialized
+      await Future.delayed(const Duration(milliseconds: 300));
+
+      print('✅ Guest mode initialized, services will load data automatically');
+    } catch (e) {
+      print('❌ Error during guest data load: $e');
     }
   }
 

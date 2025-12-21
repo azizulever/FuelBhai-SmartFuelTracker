@@ -567,8 +567,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _continueWithoutAccount() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('skipped_login', true);
+    await _authService.enableGuestMode();
 
     Get.snackbar(
       'Guest Mode',

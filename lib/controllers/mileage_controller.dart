@@ -181,15 +181,22 @@ class MileageGetxController extends GetxController {
     print('🔄 MileageController: _updateFromFuelingService called');
     print('📊 Fueling records count: ${_fuelingService.fuelingRecords.length}');
     print('👤 User logged in: ${_authService.isLoggedIn.value}');
+    print('👤 Guest mode: ${_authService.isGuestMode.value}');
 
     // Always clear fuel entries first to prevent showing stale data
     _fuelEntries.clear();
 
     // Convert fueling records back to fuel entries for local display
-    if (_fuelingService.fuelingRecords.isNotEmpty &&
-        _authService.isLoggedIn.value) {
-      final currentUserId = _authService.user.value?.uid ?? '';
+    // Works for both authenticated users and guest mode
+    if (_fuelingService.fuelingRecords.isNotEmpty) {
+      final currentUserId = _authService.getCurrentUserId();
       print('👤 Current user ID: $currentUserId');
+
+      if (currentUserId.isEmpty) {
+        print('⚠️ No user ID available');
+        update();
+        return;
+      }
 
       // Filter records to ensure only current user's data is shown
       final userRecords =
@@ -222,12 +229,9 @@ class MileageGetxController extends GetxController {
       _saveFuelEntries();
       update();
       print('🎉 UI updated with new fuel entries');
-    } else if (!_authService.isLoggedIn.value) {
-      print('ℹ️ User not logged in, clearing all data');
-      _saveFuelEntries();
-      update();
     } else {
       print('ℹ️ No records to process');
+      _saveFuelEntries();
       update();
     }
   }
@@ -265,15 +269,17 @@ class MileageGetxController extends GetxController {
   ) async {
     print('➕ MileageController: Adding fuel entry...');
 
-    // Check if user is logged in
-    if (!_authService.isLoggedIn.value || _authService.user.value == null) {
-      print('❌ Cannot add fuel entry: User not logged in');
+    // Get current user ID (works for both authenticated and guest mode)
+    final currentUserId = _authService.getCurrentUserId();
+
+    if (currentUserId.isEmpty) {
+      print('❌ Cannot add fuel entry: No user ID available');
       return;
     }
 
     try {
       final fuelingRecord = FuelingRecord(
-        userId: _authService.user.value!.uid,
+        userId: currentUserId,
         date: date,
         liters: fuelAmount,
         cost: fuelCost,
@@ -282,7 +288,8 @@ class MileageGetxController extends GetxController {
         vehicleId: vehicleType.toLowerCase(),
       );
 
-      print('📤 Adding to Firebase with userId: ${fuelingRecord.userId}');
+      print('📤 Adding fueling record with userId: ${fuelingRecord.userId}');
+      print('👤 Guest mode: ${_authService.isGuestMode.value}');
       await _fuelingService.addFuelingRecord(fuelingRecord);
       print('✅ Fuel entry added successfully');
 
@@ -302,8 +309,11 @@ class MileageGetxController extends GetxController {
   ) async {
     print('🔄 MileageController: Updating fuel entry...');
 
-    if (!_authService.isLoggedIn.value || _authService.user.value == null) {
-      print('❌ Cannot update fuel entry: User not logged in');
+    // Get current user ID (works for both authenticated and guest mode)
+    final currentUserId = _authService.getCurrentUserId();
+
+    if (currentUserId.isEmpty) {
+      print('❌ Cannot update fuel entry: No user ID available');
       return;
     }
 
@@ -314,7 +324,7 @@ class MileageGetxController extends GetxController {
       try {
         final fuelingRecord = FuelingRecord(
           id: originalEntry.id,
-          userId: _authService.user.value!.uid,
+          userId: currentUserId,
           date: date,
           liters: fuelAmount,
           cost: fuelCost,
@@ -323,7 +333,10 @@ class MileageGetxController extends GetxController {
           vehicleId: vehicleType.toLowerCase(),
         );
 
-        print('📤 Updating in Firebase with userId: ${fuelingRecord.userId}');
+        print(
+          '📤 Updating fueling record with userId: ${fuelingRecord.userId}',
+        );
+        print('👤 Guest mode: ${_authService.isGuestMode.value}');
         await _fuelingService.updateFuelingRecord(fuelingRecord);
         print('✅ Fuel entry updated successfully');
 
@@ -338,8 +351,11 @@ class MileageGetxController extends GetxController {
   void deleteEntry(int index) async {
     print('🗑️ MileageController: Deleting fuel entry...');
 
-    if (!_authService.isLoggedIn.value || _authService.user.value == null) {
-      print('❌ Cannot delete fuel entry: User not logged in');
+    // Get current user ID (works for both authenticated and guest mode)
+    final currentUserId = _authService.getCurrentUserId();
+
+    if (currentUserId.isEmpty) {
+      print('❌ Cannot delete fuel entry: No user ID available');
       return;
     }
 
@@ -348,7 +364,8 @@ class MileageGetxController extends GetxController {
 
     if (originalIndex >= 0 && entryToDelete.id.isNotEmpty) {
       try {
-        print('📤 Deleting from Firebase: ${entryToDelete.id}');
+        print('📤 Deleting fueling record: ${entryToDelete.id}');
+        print('👤 Guest mode: ${_authService.isGuestMode.value}');
         await _fuelingService.deleteFuelingRecord(entryToDelete.id);
         print('✅ Fuel entry deleted successfully');
 
@@ -569,14 +586,17 @@ class MileageGetxController extends GetxController {
     String serviceType,
     String vehicleType,
   ) async {
-    if (_authService.user.value == null) {
-      print('❌ Cannot add service record: User not logged in');
+    // Get current user ID (works for both authenticated and guest mode)
+    final currentUserId = _authService.getCurrentUserId();
+
+    if (currentUserId.isEmpty) {
+      print('❌ Cannot add service record: No user ID available');
       return;
     }
 
     final newRecord = ServiceRecord(
-      id: '', // Will be assigned by Firebase
-      userId: _authService.user.value!.uid,
+      id: '', // Will be assigned by Firebase or generated locally
+      userId: currentUserId,
       serviceDate: serviceDate,
       odometerReading: odometerReading,
       totalCost: totalCost,
@@ -585,6 +605,7 @@ class MileageGetxController extends GetxController {
     );
 
     try {
+      print('👤 Guest mode: ${_authService.isGuestMode.value}');
       await _serviceTripSync.addServiceRecord(newRecord);
       print('✅ Service record added successfully');
     } catch (e) {
@@ -648,14 +669,17 @@ class MileageGetxController extends GetxController {
   void startTrip() async {
     if (_activeTrip != null) return;
 
-    if (_authService.user.value == null) {
-      print('❌ Cannot start trip: User not logged in');
+    // Get current user ID (works for both authenticated and guest mode)
+    final currentUserId = _authService.getCurrentUserId();
+
+    if (currentUserId.isEmpty) {
+      print('❌ Cannot start trip: No user ID available');
       return;
     }
 
     final newTrip = TripRecord(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
-      userId: _authService.user.value!.uid,
+      userId: currentUserId,
       startTime: DateTime.now(),
       duration: Duration.zero,
       costEntries: [],
@@ -668,8 +692,9 @@ class MileageGetxController extends GetxController {
     _startTripTimer();
 
     try {
+      print('👤 Guest mode: ${_authService.isGuestMode.value}');
       await _serviceTripSync.addTripRecord(newTrip);
-      print('✅ Trip started and synced to Firebase');
+      print('✅ Trip started and saved');
     } catch (e) {
       print('⚠️ Trip started locally, sync failed: $e');
     }

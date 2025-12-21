@@ -286,7 +286,6 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 40),
               ],
             ),

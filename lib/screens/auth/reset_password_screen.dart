@@ -117,7 +117,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
                   // Subtitle
                   Text(
-                    'Enter new password to confinue.',
+                    'Enter new password to continue.',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w400,

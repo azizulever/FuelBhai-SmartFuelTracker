@@ -5,15 +5,19 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:mileage_calculator/controllers/mileage_controller.dart';
 import 'package:mileage_calculator/services/fueling_service.dart';
 import 'package:mileage_calculator/services/service_trip_sync.dart';
+import 'package:mileage_calculator/services/local_storage_service.dart';
 import 'package:mileage_calculator/utils/theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService extends GetxController {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
+  final LocalStorageService _localStorageService = LocalStorageService();
 
   RxBool isLoading = false.obs;
   RxBool isLoggedIn = false.obs;
+  RxBool isGuestMode = false.obs;
+  RxString guestUserId = ''.obs;
 
   Rx<User?> user = Rx<User?>(null);
 
@@ -23,11 +27,30 @@ class AuthService extends GetxController {
     user.value = _auth.currentUser;
     isLoggedIn.value = user.value != null;
 
+    // Check if user is in guest mode
+    _checkGuestMode();
+
     // Listen for authentication state changes
     _auth.authStateChanges().listen((User? firebaseUser) {
       user.value = firebaseUser;
       isLoggedIn.value = firebaseUser != null;
+
+      if (firebaseUser != null) {
+        // User logged in, disable guest mode
+        isGuestMode.value = false;
+      }
     });
+  }
+
+  /// Check if the user is in guest mode
+  Future<void> _checkGuestMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    isGuestMode.value = prefs.getBool('skipped_login') ?? false;
+
+    if (isGuestMode.value) {
+      guestUserId.value = await _localStorageService.getGuestUserId();
+      print('👤 Guest mode active with ID: ${guestUserId.value}');
+    }
   }
 
   Future<bool> registerWithEmail(
@@ -51,6 +74,11 @@ class AuthService extends GetxController {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('user_email', email);
       await prefs.setString('user_name', name ?? 'User');
+
+      // Migrate guest data if in guest mode before syncing
+      if (isGuestMode.value) {
+        await _migrateGuestDataToFirebase();
+      }
 
       // Trigger data sync after successful registration
       await _syncDataAfterLogin();
@@ -130,6 +158,11 @@ class AuthService extends GetxController {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('user_email', email);
       await prefs.setString('user_name', displayName);
+
+      // Migrate guest data if in guest mode before syncing
+      if (isGuestMode.value) {
+        await _migrateGuestDataToFirebase();
+      }
 
       // Trigger data sync after successful login
       await _syncDataAfterLogin();
@@ -222,6 +255,11 @@ class AuthService extends GetxController {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('user_email', googleUser.email);
       await prefs.setString('user_name', googleUser.displayName ?? 'User');
+
+      // Migrate guest data if in guest mode before syncing
+      if (isGuestMode.value) {
+        await _migrateGuestDataToFirebase();
+      }
 
       // Trigger data sync after successful login
       await _syncDataAfterLogin();
@@ -434,6 +472,12 @@ class AuthService extends GetxController {
       await prefs.remove('user_name');
       await prefs.remove('user_email');
 
+      // Clear guest mode if active
+      if (isGuestMode.value) {
+        await _localStorageService.clearAllGuestData();
+        await disableGuestMode();
+      }
+
       Get.snackbar(
         'Success',
         'Logged out successfully',
@@ -466,6 +510,74 @@ class AuthService extends GetxController {
 
   String getCurrentUserName() {
     return _auth.currentUser?.displayName ?? 'Guest User';
+  }
+
+  /// Enable guest mode
+  Future<void> enableGuestMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('skipped_login', true);
+    isGuestMode.value = true;
+    guestUserId.value = await _localStorageService.getGuestUserId();
+    print('✅ Guest mode enabled with ID: ${guestUserId.value}');
+  }
+
+  /// Disable guest mode
+  Future<void> disableGuestMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('skipped_login');
+    isGuestMode.value = false;
+    guestUserId.value = '';
+    print('✅ Guest mode disabled');
+  }
+
+  /// Get current user ID (either Firebase user ID or guest ID)
+  String getCurrentUserId() {
+    if (isLoggedIn.value && user.value != null) {
+      return user.value!.uid;
+    } else if (isGuestMode.value) {
+      return guestUserId.value;
+    }
+    return '';
+  }
+
+  /// Migrate guest data to Firebase when user logs in
+  Future<void> _migrateGuestDataToFirebase() async {
+    try {
+      print('🔄 Starting migration of guest data to Firebase...');
+
+      if (!isLoggedIn.value || user.value == null) {
+        print('❌ Cannot migrate: User not logged in');
+        return;
+      }
+
+      final currentUserId = user.value!.uid;
+
+      // Get FuelingService and migrate data
+      try {
+        final fuelingService = Get.find<FuelingService>();
+        await fuelingService.migrateGuestDataToFirebase(currentUserId);
+        print('✅ Fueling data migrated');
+      } catch (e) {
+        print('⚠️ Error migrating fueling data: $e');
+      }
+
+      // Get ServiceTripSyncService and migrate data
+      try {
+        final serviceTripSync = Get.find<ServiceTripSyncService>();
+        await serviceTripSync.migrateGuestDataToFirebase(currentUserId);
+        print('✅ Service and Trip data migrated');
+      } catch (e) {
+        print('⚠️ Error migrating service/trip data: $e');
+      }
+
+      // Clear guest data after successful migration
+      await _localStorageService.clearAllGuestData();
+      await disableGuestMode();
+
+      print('✅ Guest data migration completed successfully');
+    } catch (e) {
+      print('❌ Error during guest data migration: $e');
+    }
   }
 
   // Method to sync data from Firebase to offline storage after successful login

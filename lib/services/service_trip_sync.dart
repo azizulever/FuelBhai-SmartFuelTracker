@@ -3,11 +3,13 @@ import 'package:get/get.dart';
 import 'package:mileage_calculator/models/service_record.dart';
 import 'package:mileage_calculator/models/trip_record.dart';
 import 'package:mileage_calculator/services/auth_service.dart';
+import 'package:mileage_calculator/services/local_storage_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 
 class ServiceTripSyncService extends GetxController {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final LocalStorageService _localStorageService = LocalStorageService();
   late final AuthService _authService;
 
   RxList<ServiceRecord> serviceRecords = <ServiceRecord>[].obs;
@@ -26,6 +28,19 @@ class ServiceTripSyncService extends GetxController {
       print('⚠️ AuthService not found, creating new instance');
       _authService = Get.put(AuthService());
     }
+
+    // Load data based on auth state
+    if (_authService.isGuestMode.value && !_authService.isLoggedIn.value) {
+      print('👤 Guest mode active, loading local service/trip data');
+      _loadGuestData();
+    }
+
+    // Listen for guest mode changes
+    _authService.isGuestMode.listen((isGuest) {
+      if (isGuest && !_authService.isLoggedIn.value) {
+        _loadGuestData();
+      }
+    });
   }
 
   // ========== SERVICE RECORDS ==========
@@ -68,6 +83,29 @@ class ServiceTripSyncService extends GetxController {
   Future<void> addServiceRecord(ServiceRecord record) async {
     try {
       isLoading.value = true;
+
+      // Check if user is in guest mode
+      if (_authService.isGuestMode.value && !_authService.isLoggedIn.value) {
+        print('👤 Guest mode: Saving service record to local storage');
+        final tempId = DateTime.now().millisecondsSinceEpoch.toString();
+        final guestUserId = _authService.getCurrentUserId();
+
+        final guestRecord = ServiceRecord(
+          id: tempId,
+          userId: guestUserId,
+          serviceDate: record.serviceDate,
+          odometerReading: record.odometerReading,
+          totalCost: record.totalCost,
+          serviceType: record.serviceType,
+          vehicleType: record.vehicleType,
+        );
+
+        await _localStorageService.addServiceRecord(guestRecord);
+        serviceRecords.insert(0, guestRecord);
+        serviceRecords.sort((a, b) => b.serviceDate.compareTo(a.serviceDate));
+        print('✅ Guest service record saved locally');
+        return;
+      }
 
       if (_authService.user.value == null) {
         throw Exception('User not logged in');
@@ -124,6 +162,15 @@ class ServiceTripSyncService extends GetxController {
   Future<void> deleteServiceRecord(String recordId) async {
     try {
       isLoading.value = true;
+
+      // Check if user is in guest mode
+      if (_authService.isGuestMode.value && !_authService.isLoggedIn.value) {
+        print('👤 Guest mode: Deleting service record from local storage');
+        await _localStorageService.deleteServiceRecord(recordId);
+        serviceRecords.removeWhere((r) => r.id == recordId);
+        print('✅ Guest service record deleted locally');
+        return;
+      }
 
       // Remove locally
       serviceRecords.removeWhere((r) => r.id == recordId);
@@ -203,6 +250,30 @@ class ServiceTripSyncService extends GetxController {
     try {
       isLoading.value = true;
 
+      // Check if user is in guest mode
+      if (_authService.isGuestMode.value && !_authService.isLoggedIn.value) {
+        print('👤 Guest mode: Saving trip record to local storage');
+        final tempId = DateTime.now().millisecondsSinceEpoch.toString();
+        final guestUserId = _authService.getCurrentUserId();
+
+        final guestRecord = TripRecord(
+          id: tempId,
+          userId: guestUserId,
+          startTime: record.startTime,
+          endTime: record.endTime,
+          duration: record.duration,
+          costEntries: record.costEntries,
+          vehicleType: record.vehicleType,
+          isActive: record.isActive,
+        );
+
+        await _localStorageService.addTripRecord(guestRecord);
+        tripRecords.insert(0, guestRecord);
+        tripRecords.sort((a, b) => b.startTime.compareTo(a.startTime));
+        print('✅ Guest trip record saved locally');
+        return;
+      }
+
       if (_authService.user.value == null) {
         throw Exception('User not logged in');
       }
@@ -261,6 +332,19 @@ class ServiceTripSyncService extends GetxController {
     try {
       isLoading.value = true;
 
+      // Check if user is in guest mode
+      if (_authService.isGuestMode.value && !_authService.isLoggedIn.value) {
+        print('👤 Guest mode: Updating trip record in local storage');
+        await _localStorageService.updateTripRecord(record);
+
+        final index = tripRecords.indexWhere((r) => r.id == record.id);
+        if (index != -1) {
+          tripRecords[index] = record;
+        }
+        print('✅ Guest trip record updated locally');
+        return;
+      }
+
       // Update locally
       final index = tripRecords.indexWhere((r) => r.id == record.id);
       if (index != -1) {
@@ -289,6 +373,15 @@ class ServiceTripSyncService extends GetxController {
   Future<void> deleteTripRecord(String recordId) async {
     try {
       isLoading.value = true;
+
+      // Check if user is in guest mode
+      if (_authService.isGuestMode.value && !_authService.isLoggedIn.value) {
+        print('👤 Guest mode: Deleting trip record from local storage');
+        await _localStorageService.deleteTripRecord(recordId);
+        tripRecords.removeWhere((r) => r.id == recordId);
+        print('✅ Guest trip record deleted locally');
+        return;
+      }
 
       // Remove locally
       tripRecords.removeWhere((r) => r.id == recordId);
@@ -342,5 +435,89 @@ class ServiceTripSyncService extends GetxController {
     await prefs.remove('service_records');
     await prefs.remove('trip_records');
     print('✅ Service and Trip local data cleared');
+  }
+
+  // ========== GUEST MODE SUPPORT ==========
+
+  /// Load guest data from local storage
+  Future<void> _loadGuestData() async {
+    print('💾 Loading guest service/trip data from local storage...');
+    try {
+      final services = await _localStorageService.loadServiceRecords();
+      final trips = await _localStorageService.loadTripRecords();
+
+      serviceRecords.value = services;
+      tripRecords.value = trips;
+
+      print(
+        '✅ Loaded ${services.length} service records and ${trips.length} trip records for guest',
+      );
+    } catch (e) {
+      print('❌ Error loading guest service/trip data: $e');
+      serviceRecords.clear();
+      tripRecords.clear();
+    }
+  }
+
+  /// Migrate guest data to Firebase when user logs in
+  Future<void> migrateGuestDataToFirebase(String newUserId) async {
+    print('🔄 Migrating guest service/trip data to Firebase...');
+    try {
+      // Load guest data
+      final guestServices = await _localStorageService.loadServiceRecords();
+      final guestTrips = await _localStorageService.loadTripRecords();
+
+      print(
+        '📤 Migrating ${guestServices.length} service records and ${guestTrips.length} trip records...',
+      );
+
+      // Migrate service records
+      for (var record in guestServices) {
+        final newRecord = ServiceRecord(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          userId: newUserId,
+          serviceDate: record.serviceDate,
+          odometerReading: record.odometerReading,
+          totalCost: record.totalCost,
+          serviceType: record.serviceType,
+          vehicleType: record.vehicleType,
+        );
+
+        try {
+          await _firestore.collection('service_records').add(newRecord.toMap());
+          print('✅ Migrated service record from ${record.serviceDate}');
+        } catch (e) {
+          print('⚠️ Failed to migrate service record: $e');
+        }
+      }
+
+      // Migrate trip records
+      for (var record in guestTrips) {
+        final newRecord = TripRecord(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          userId: newUserId,
+          startTime: record.startTime,
+          endTime: record.endTime,
+          duration: record.duration,
+          costEntries: record.costEntries,
+          vehicleType: record.vehicleType,
+          isActive: record.isActive,
+        );
+
+        try {
+          await _firestore.collection('trip_records').add(newRecord.toMap());
+          print('✅ Migrated trip record from ${record.startTime}');
+        } catch (e) {
+          print('⚠️ Failed to migrate trip record: $e');
+        }
+      }
+
+      // Clear guest data after migration
+      await _localStorageService.clearServiceRecords();
+      await _localStorageService.clearTripRecords();
+      print('✅ Guest service/trip data migration completed and cleared');
+    } catch (e) {
+      print('❌ Error migrating guest service/trip data: $e');
+    }
   }
 }

@@ -2,12 +2,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:get/get.dart';
 import 'package:mileage_calculator/models/fueling_record.dart';
 import 'package:mileage_calculator/services/auth_service.dart';
+import 'package:mileage_calculator/services/local_storage_service.dart';
 import 'package:mileage_calculator/controllers/mileage_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 
 class FuelingService extends GetxController {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final LocalStorageService _localStorageService = LocalStorageService();
   late final AuthService _authService;
 
   RxList<FuelingRecord> fuelingRecords = <FuelingRecord>[].obs;
@@ -41,6 +43,10 @@ class FuelingService extends GetxController {
       // Clear any existing data first
       fuelingRecords.clear();
       fetchFuelingRecords();
+    } else if (_authService.isGuestMode.value) {
+      print('👤 Guest mode active, loading local records');
+      fuelingRecords.clear();
+      _loadGuestData();
     } else {
       print('👤 User not logged in, ensuring empty state');
       fuelingRecords.clear();
@@ -76,6 +82,16 @@ class FuelingService extends GetxController {
         fuelingRecords.clear();
         pendingOperations.clear();
         _clearAllLocalData();
+      }
+    });
+
+    // Listen for guest mode changes
+    _authService.isGuestMode.listen((isGuest) {
+      print('🔄 Guest mode changed: isGuest = $isGuest');
+      if (isGuest && !_authService.isLoggedIn.value) {
+        print('👤 Guest mode activated, loading local data');
+        fuelingRecords.clear();
+        _loadGuestData();
       }
     });
 
@@ -408,6 +424,31 @@ class FuelingService extends GetxController {
       isLoading.value = true;
       print('⏳ Loading state set to true');
 
+      // Check if user is in guest mode
+      if (_authService.isGuestMode.value && !_authService.isLoggedIn.value) {
+        print('👤 Guest mode: Saving to local storage');
+        final tempId = DateTime.now().millisecondsSinceEpoch.toString();
+        final guestUserId = _authService.getCurrentUserId();
+
+        final guestRecord = FuelingRecord(
+          id: tempId,
+          userId: guestUserId,
+          date: record.date,
+          liters: record.liters,
+          cost: record.cost,
+          odometer: record.odometer,
+          notes: record.notes,
+          vehicleId: record.vehicleId,
+        );
+
+        await _localStorageService.addFuelingRecord(guestRecord);
+        fuelingRecords.insert(0, guestRecord);
+        fuelingRecords.sort((a, b) => b.date.compareTo(a.date));
+        print('✅ Guest record saved locally with ID: $tempId');
+        return tempId;
+      }
+
+      // Firebase mode (authenticated user)
       if (_authService.user.value == null) {
         print('❌ User not logged in - throwing exception');
         throw Exception('User not logged in');
@@ -510,6 +551,19 @@ class FuelingService extends GetxController {
         throw Exception('Record ID is null');
       }
 
+      // Check if user is in guest mode
+      if (_authService.isGuestMode.value && !_authService.isLoggedIn.value) {
+        print('👤 Guest mode: Updating local storage');
+        await _localStorageService.updateFuelingRecord(record);
+
+        final index = fuelingRecords.indexWhere((r) => r.id == record.id);
+        if (index != -1) {
+          fuelingRecords[index] = record;
+        }
+        print('✅ Guest record updated locally');
+        return;
+      }
+
       // Update local record immediately (optimistic update)
       final index = fuelingRecords.indexWhere((r) => r.id == record.id);
       if (index != -1) {
@@ -547,6 +601,15 @@ class FuelingService extends GetxController {
   Future<void> deleteFuelingRecord(String recordId) async {
     try {
       isLoading.value = true;
+
+      // Check if user is in guest mode
+      if (_authService.isGuestMode.value && !_authService.isLoggedIn.value) {
+        print('👤 Guest mode: Deleting from local storage');
+        await _localStorageService.deleteFuelingRecord(recordId);
+        fuelingRecords.removeWhere((r) => r.id == recordId);
+        print('✅ Guest record deleted locally');
+        return;
+      }
 
       // Remove from local list immediately (optimistic update)
       fuelingRecords.removeWhere((r) => r.id == recordId);
@@ -735,6 +798,63 @@ class FuelingService extends GetxController {
       print('❌ Firebase connection test FAILED: $e');
       print('📝 Error type: ${e.runtimeType}');
       print('📋 Error details: ${e.toString()}');
+    }
+  }
+
+  // ========== GUEST MODE SUPPORT ==========
+
+  /// Load guest data from local storage
+  Future<void> _loadGuestData() async {
+    print('💾 Loading guest data from local storage...');
+    try {
+      final records = await _localStorageService.loadFuelingRecords();
+      fuelingRecords.value = records;
+      print('✅ Loaded ${records.length} guest records');
+    } catch (e) {
+      print('❌ Error loading guest data: $e');
+      fuelingRecords.clear();
+    }
+  }
+
+  /// Migrate guest data to Firebase when user logs in
+  Future<void> migrateGuestDataToFirebase(String newUserId) async {
+    print('🔄 Migrating guest fueling data to Firebase...');
+    try {
+      // Load guest data
+      final guestRecords = await _localStorageService.loadFuelingRecords();
+
+      if (guestRecords.isEmpty) {
+        print('ℹ️ No guest fueling records to migrate');
+        return;
+      }
+
+      print('📤 Migrating ${guestRecords.length} guest records...');
+
+      // Upload each record to Firebase with new user ID
+      for (var record in guestRecords) {
+        final newRecord = FuelingRecord(
+          userId: newUserId,
+          date: record.date,
+          liters: record.liters,
+          cost: record.cost,
+          odometer: record.odometer,
+          notes: record.notes,
+          vehicleId: record.vehicleId,
+        );
+
+        try {
+          await _firestore.collection('fueling_records').add(newRecord.toMap());
+          print('✅ Migrated record from ${record.date}');
+        } catch (e) {
+          print('⚠️ Failed to migrate record: $e');
+        }
+      }
+
+      // Clear guest data after migration
+      await _localStorageService.clearFuelingRecords();
+      print('✅ Guest fueling data migration completed and cleared');
+    } catch (e) {
+      print('❌ Error migrating guest data: $e');
     }
   }
 }

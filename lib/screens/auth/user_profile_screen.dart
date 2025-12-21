@@ -64,7 +64,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         // Now set text controller values and update UI
         setState(() {
           _nameController.text = currentUser.displayName ?? 'Guest User';
-          _emailController.text = currentUser.email ?? 'guest@tankibhai.com';
+          _emailController.text = currentUser.email ?? 'guest@fuelbhai.com';
         });
       } else {
         // Fallback to SharedPreferences if no Firebase user (guest mode)
@@ -72,7 +72,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         setState(() {
           _nameController.text = prefs.getString('user_name') ?? 'Guest User';
           _emailController.text =
-              prefs.getString('user_email') ?? 'guest@tankibhai.com';
+              prefs.getString('user_email') ?? 'guest@fuelbhai.com';
         });
       }
     } catch (e) {
@@ -82,7 +82,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       // Fallback values
       setState(() {
         _nameController.text = 'Guest User';
-        _emailController.text = 'guest@tankibhai.com';
+        _emailController.text = 'guest@fuelbhai.com';
       });
     }
   }
@@ -173,7 +173,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   Text(
                     _emailController.text.isNotEmpty
                         ? _emailController.text
-                        : 'guest@tankibhai.com',
+                        : 'guest@fuelbhai.com',
                     style: TextStyle(
                       color: Colors.white.withOpacity(0.8),
                       fontSize: 14,
