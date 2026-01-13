@@ -28,7 +28,7 @@ class AuthService extends GetxController {
     isLoggedIn.value = user.value != null;
 
     // Check if user is in guest mode
-    _checkGuestMode();
+    checkGuestMode();
 
     // Listen for authentication state changes
     _auth.authStateChanges().listen((User? firebaseUser) {
@@ -43,7 +43,7 @@ class AuthService extends GetxController {
   }
 
   /// Check if the user is in guest mode
-  Future<void> _checkGuestMode() async {
+  Future<void> checkGuestMode() async {
     final prefs = await SharedPreferences.getInstance();
     isGuestMode.value = prefs.getBool('skipped_login') ?? false;
 
@@ -441,6 +441,9 @@ class AuthService extends GetxController {
 
   Future<void> signOut() async {
     try {
+      // Get current user ID before signing out to clear user-specific data
+      final currentUserId = getCurrentUserId();
+
       // Clear fueling data first
       try {
         final fuelingService = Get.find<FuelingService>();
@@ -457,6 +460,24 @@ class AuthService extends GetxController {
         print('✅ Service and Trip data cleared');
       } catch (e) {
         print('⚠️ Could not clear service/trip data: $e');
+      }
+
+      // Clear user-specific local storage keys
+      if (currentUserId.isNotEmpty) {
+        final prefs = await SharedPreferences.getInstance();
+
+        // Clear all user-specific keys
+        final keysToRemove = [
+          'offline_fueling_records_$currentUserId',
+          'pending_operations_$currentUserId',
+          'service_records_$currentUserId',
+          'trip_records_$currentUserId',
+        ];
+
+        for (var key in keysToRemove) {
+          await prefs.remove(key);
+          print('🗑️ Removed: $key');
+        }
       }
 
       // Sign out from Firebase
@@ -588,12 +609,25 @@ class AuthService extends GetxController {
       // Wait a moment to ensure auth state is fully updated
       await Future.delayed(const Duration(milliseconds: 200));
 
-      // Clear any cached local data to ensure fresh start - but preserve offline records temporarily
+      final currentUserId = user.value?.uid ?? '';
+      if (currentUserId.isEmpty) {
+        print('⚠️ No user ID available, skipping sync');
+        return;
+      }
+
+      // Clear any cached local data to ensure fresh start
       final prefs = await SharedPreferences.getInstance();
-      print('🗑️ Clearing cached Service and Trip records...');
+      print('🗑️ Clearing old cached records for fresh sync...');
+
+      // Clear user-specific keys for service and trip records
+      await prefs.remove('service_records_$currentUserId');
+      await prefs.remove('trip_records_$currentUserId');
+
+      // Also clear legacy global keys for backward compatibility
       await prefs.remove('service_records');
       await prefs.remove('trip_records');
-      // Don't clear fuel_entries or offline_fueling_records here - let FuelingService handle it
+
+      print('✅ Old cache cleared');
 
       // Get FuelingService and trigger immediate sync
       final fuelingService = Get.find<FuelingService>();

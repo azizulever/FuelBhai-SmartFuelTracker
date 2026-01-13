@@ -41,6 +41,13 @@ class MileageGetxController extends GetxController {
     _loadFuelEntries();
     _loadServiceRecords();
     _loadTripRecords();
+
+    // Trigger initial update from services in case data was already loaded
+    Future.delayed(Duration.zero, () {
+      _updateFromFuelingService();
+      _updateServiceRecordsFromSync();
+      _updateTripRecordsFromSync();
+    });
   }
 
   void _initializeServices() {
@@ -141,6 +148,10 @@ class MileageGetxController extends GetxController {
         '👤 User is logged in (${_authService.user.value!.uid}), will fetch from Firebase',
       );
       // Data will be loaded via _updateFromFuelingService after Firebase sync
+    } else if (_authService.isGuestMode.value) {
+      print('👤 Guest mode active, loading from FuelingService');
+      // Trigger update from FuelingService for guest data
+      _updateFromFuelingService();
     } else {
       print('ℹ️ User not logged in, keeping empty state');
     }

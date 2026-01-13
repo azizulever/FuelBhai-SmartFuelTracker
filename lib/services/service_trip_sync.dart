@@ -30,17 +30,57 @@ class ServiceTripSyncService extends GetxController {
     }
 
     // Load data based on auth state
-    if (_authService.isGuestMode.value && !_authService.isLoggedIn.value) {
+    if (_authService.isLoggedIn.value) {
+      print(
+        '👤 User is logged in, fetching service/trip records from Firebase',
+      );
+      serviceRecords.clear();
+      tripRecords.clear();
+      syncFromFirebase();
+    } else if (_authService.isGuestMode.value) {
       print('👤 Guest mode active, loading local service/trip data');
+      serviceRecords.clear();
+      tripRecords.clear();
       _loadGuestData();
+    } else {
+      print('👤 User not logged in, ensuring empty state');
+      serviceRecords.clear();
+      tripRecords.clear();
     }
+
+    // Listen for auth state changes
+    _authService.isLoggedIn.listen((isLoggedIn) {
+      print('🔄 ServiceTripSync: Auth state changed: isLoggedIn = $isLoggedIn');
+      if (isLoggedIn) {
+        print('✅ User logged in, fetching service/trip records from Firebase');
+        serviceRecords.clear();
+        tripRecords.clear();
+        Future.delayed(const Duration(milliseconds: 300), () {
+          if (_authService.isLoggedIn.value &&
+              _authService.user.value != null) {
+            syncFromFirebase();
+          }
+        });
+      } else {
+        print('❌ User logged out, clearing all service/trip data');
+        serviceRecords.clear();
+        tripRecords.clear();
+        clearAllLocalData();
+      }
+    });
 
     // Listen for guest mode changes
     _authService.isGuestMode.listen((isGuest) {
+      print('🔄 ServiceTripSync: Guest mode changed: isGuest = $isGuest');
       if (isGuest && !_authService.isLoggedIn.value) {
+        print('👤 Guest mode activated, loading local service/trip data');
+        serviceRecords.clear();
+        tripRecords.clear();
         _loadGuestData();
       }
     });
+
+    print('🎉 ServiceTripSyncService initialization completed');
   }
 
   // ========== SERVICE RECORDS ==========
@@ -57,18 +97,36 @@ class ServiceTripSyncService extends GetxController {
 
       print('🔄 Fetching service records for user: $userId');
 
-      final snapshot =
-          await _firestore
-              .collection('service_records')
-              .where('userId', isEqualTo: userId)
-              .orderBy('serviceDate', descending: true)
-              .get();
+      QuerySnapshot snapshot;
+      try {
+        // Try with orderBy first (requires composite index)
+        snapshot =
+            await _firestore
+                .collection('service_records')
+                .where('userId', isEqualTo: userId)
+                .orderBy('serviceDate', descending: true)
+                .get();
+      } catch (e) {
+        // If index doesn't exist, query without orderBy and sort locally
+        print(
+          '⚠️ Composite index not found for service_records, querying without orderBy',
+        );
+        snapshot =
+            await _firestore
+                .collection('service_records')
+                .where('userId', isEqualTo: userId)
+                .get();
+      }
 
       serviceRecords.clear();
       for (var doc in snapshot.docs) {
-        final record = ServiceRecord.fromMap(doc.data(), doc.id);
+        final data = doc.data() as Map<String, dynamic>;
+        final record = ServiceRecord.fromMap(data, doc.id);
         serviceRecords.add(record);
       }
+
+      // Sort locally by date (descending)
+      serviceRecords.sort((a, b) => b.serviceDate.compareTo(a.serviceDate));
 
       await _saveServiceRecordsLocally();
       print('✅ Fetched ${serviceRecords.length} service records');
@@ -192,21 +250,58 @@ class ServiceTripSyncService extends GetxController {
   }
 
   Future<void> _saveServiceRecordsLocally() async {
-    final prefs = await SharedPreferences.getInstance();
-    final recordsJson =
-        serviceRecords.map((record) => json.encode(record.toJson())).toList();
-    await prefs.setStringList('service_records', recordsJson);
+    try {
+      final currentUserId = _authService.getCurrentUserId();
+      if (currentUserId.isEmpty) {
+        print('⚠️ No user ID available, skipping service records save');
+        return;
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      final recordsJson =
+          serviceRecords.map((record) => json.encode(record.toJson())).toList();
+
+      // Use user-specific key for data isolation
+      final userSpecificKey = 'service_records_$currentUserId';
+      await prefs.setStringList(userSpecificKey, recordsJson);
+      print(
+        '✅ Saved ${recordsJson.length} service records for user: $currentUserId',
+      );
+    } catch (e) {
+      print('❌ Error saving service records: $e');
+    }
   }
 
   Future<void> _loadServiceRecordsLocally() async {
-    final prefs = await SharedPreferences.getInstance();
-    final recordsJson = prefs.getStringList('service_records') ?? [];
+    try {
+      final currentUserId = _authService.getCurrentUserId();
+      if (currentUserId.isEmpty) {
+        print('⚠️ No user ID available, skipping service records load');
+        serviceRecords.clear();
+        return;
+      }
 
-    serviceRecords.clear();
-    for (var recordJson in recordsJson) {
-      serviceRecords.add(ServiceRecord.fromJson(json.decode(recordJson)));
+      final prefs = await SharedPreferences.getInstance();
+      // Use user-specific key for data isolation
+      final userSpecificKey = 'service_records_$currentUserId';
+      final recordsJson = prefs.getStringList(userSpecificKey) ?? [];
+
+      serviceRecords.clear();
+      for (var recordJson in recordsJson) {
+        final record = ServiceRecord.fromJson(json.decode(recordJson));
+        // Double-check user ID matches
+        if (record.userId == currentUserId) {
+          serviceRecords.add(record);
+        }
+      }
+      serviceRecords.sort((a, b) => b.serviceDate.compareTo(a.serviceDate));
+      print(
+        '✅ Loaded ${serviceRecords.length} service records for user: $currentUserId',
+      );
+    } catch (e) {
+      print('❌ Error loading service records: $e');
+      serviceRecords.clear();
     }
-    serviceRecords.sort((a, b) => b.serviceDate.compareTo(a.serviceDate));
   }
 
   // ========== TRIP RECORDS ==========
@@ -223,18 +318,36 @@ class ServiceTripSyncService extends GetxController {
 
       print('🔄 Fetching trip records for user: $userId');
 
-      final snapshot =
-          await _firestore
-              .collection('trip_records')
-              .where('userId', isEqualTo: userId)
-              .orderBy('startTime', descending: true)
-              .get();
+      QuerySnapshot snapshot;
+      try {
+        // Try with orderBy first (requires composite index)
+        snapshot =
+            await _firestore
+                .collection('trip_records')
+                .where('userId', isEqualTo: userId)
+                .orderBy('startTime', descending: true)
+                .get();
+      } catch (e) {
+        // If index doesn't exist, query without orderBy and sort locally
+        print(
+          '⚠️ Composite index not found for trip_records, querying without orderBy',
+        );
+        snapshot =
+            await _firestore
+                .collection('trip_records')
+                .where('userId', isEqualTo: userId)
+                .get();
+      }
 
       tripRecords.clear();
       for (var doc in snapshot.docs) {
-        final record = TripRecord.fromMap(doc.data(), doc.id);
+        final data = doc.data() as Map<String, dynamic>;
+        final record = TripRecord.fromMap(data, doc.id);
         tripRecords.add(record);
       }
+
+      // Sort locally by startTime (descending)
+      tripRecords.sort((a, b) => b.startTime.compareTo(a.startTime));
 
       await _saveTripRecordsLocally();
       print('✅ Fetched ${tripRecords.length} trip records');
@@ -403,37 +516,108 @@ class ServiceTripSyncService extends GetxController {
   }
 
   Future<void> _saveTripRecordsLocally() async {
-    final prefs = await SharedPreferences.getInstance();
-    final recordsJson =
-        tripRecords.map((record) => json.encode(record.toJson())).toList();
-    await prefs.setStringList('trip_records', recordsJson);
+    try {
+      final currentUserId = _authService.getCurrentUserId();
+      if (currentUserId.isEmpty) {
+        print('⚠️ No user ID available, skipping trip records save');
+        return;
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      final recordsJson =
+          tripRecords.map((record) => json.encode(record.toJson())).toList();
+
+      // Use user-specific key for data isolation
+      final userSpecificKey = 'trip_records_$currentUserId';
+      await prefs.setStringList(userSpecificKey, recordsJson);
+      print(
+        '✅ Saved ${recordsJson.length} trip records for user: $currentUserId',
+      );
+    } catch (e) {
+      print('❌ Error saving trip records: $e');
+    }
   }
 
   Future<void> _loadTripRecordsLocally() async {
-    final prefs = await SharedPreferences.getInstance();
-    final recordsJson = prefs.getStringList('trip_records') ?? [];
+    try {
+      final currentUserId = _authService.getCurrentUserId();
+      if (currentUserId.isEmpty) {
+        print('⚠️ No user ID available, skipping trip records load');
+        tripRecords.clear();
+        return;
+      }
 
-    tripRecords.clear();
-    for (var recordJson in recordsJson) {
-      tripRecords.add(TripRecord.fromJson(json.decode(recordJson)));
+      final prefs = await SharedPreferences.getInstance();
+      // Use user-specific key for data isolation
+      final userSpecificKey = 'trip_records_$currentUserId';
+      final recordsJson = prefs.getStringList(userSpecificKey) ?? [];
+
+      tripRecords.clear();
+      for (var recordJson in recordsJson) {
+        final record = TripRecord.fromJson(json.decode(recordJson));
+        // Double-check user ID matches
+        if (record.userId == currentUserId) {
+          tripRecords.add(record);
+        }
+      }
+      tripRecords.sort((a, b) => b.startTime.compareTo(a.startTime));
+      print(
+        '✅ Loaded ${tripRecords.length} trip records for user: $currentUserId',
+      );
+    } catch (e) {
+      print('❌ Error loading trip records: $e');
+      tripRecords.clear();
     }
-    tripRecords.sort((a, b) => b.startTime.compareTo(a.startTime));
   }
 
   // ========== SYNC METHODS ==========
 
   Future<void> syncFromFirebase() async {
     print('🔄 Syncing Service and Trip records from Firebase...');
-    await Future.wait([fetchServiceRecords(), fetchTripRecords()]);
-    print('✅ Service and Trip sync completed');
+
+    try {
+      // Clear existing data before fresh sync
+      serviceRecords.clear();
+      tripRecords.clear();
+
+      // Fetch both service and trip records in parallel
+      await Future.wait([fetchServiceRecords(), fetchTripRecords()]);
+
+      // Force notify reactive listeners
+      serviceRecords.refresh();
+      tripRecords.refresh();
+
+      print('✅ Service and Trip sync completed');
+      print(
+        '📊 Service records: ${serviceRecords.length}, Trip records: ${tripRecords.length}',
+      );
+    } catch (e) {
+      print('❌ Error during Service/Trip sync: $e');
+      // Attempt to load from local cache as fallback
+      await _loadServiceRecordsLocally();
+      await _loadTripRecordsLocally();
+    }
   }
 
   Future<void> clearAllLocalData() async {
+    final currentUserId = _authService.getCurrentUserId();
+
     serviceRecords.clear();
     tripRecords.clear();
+
     final prefs = await SharedPreferences.getInstance();
+
+    // Clear user-specific keys
+    if (currentUserId.isNotEmpty) {
+      await prefs.remove('service_records_$currentUserId');
+      await prefs.remove('trip_records_$currentUserId');
+      print('✅ Cleared user-specific service/trip data for: $currentUserId');
+    }
+
+    // Also clear legacy global keys for backward compatibility
     await prefs.remove('service_records');
     await prefs.remove('trip_records');
+
     print('✅ Service and Trip local data cleared');
   }
 

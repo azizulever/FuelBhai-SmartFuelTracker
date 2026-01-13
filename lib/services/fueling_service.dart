@@ -111,8 +111,12 @@ class FuelingService extends GetxController {
       print('👤 Loading offline data for user: $currentUserId');
 
       final prefs = await SharedPreferences.getInstance();
-      final offlineData = prefs.getStringList('offline_fueling_records') ?? [];
-      print('📊 Found ${offlineData.length} offline records');
+      // Use user-specific key for better data isolation
+      final userSpecificKey = 'offline_fueling_records_$currentUserId';
+      final offlineData = prefs.getStringList(userSpecificKey) ?? [];
+      print(
+        '📊 Found ${offlineData.length} offline records for user-specific key',
+      );
 
       if (offlineData.isNotEmpty) {
         final records =
@@ -121,23 +125,24 @@ class FuelingService extends GetxController {
               return FuelingRecord.fromJson(jsonData);
             }).toList();
 
-        // CRITICAL: Filter records for current user ONLY
+        // Double-check: Filter records for current user ONLY (safety check)
         final userSpecificRecords =
             records.where((record) => record.userId == currentUserId).toList();
 
         print(
-          '🔍 Filtered to ${userSpecificRecords.length} records for user: $currentUserId (from ${records.length} total)',
+          '🔍 Loaded ${userSpecificRecords.length} records for user: $currentUserId',
         );
 
         fuelingRecords.value = userSpecificRecords;
         print('✅ Loaded ${userSpecificRecords.length} offline records');
       } else {
-        print('ℹ️ No offline records found');
+        print('ℹ️ No offline records found for this user');
       }
 
-      // Load pending operations
-      final pendingData = prefs.getStringList('pending_operations') ?? [];
-      print('📊 Found ${pendingData.length} pending operations');
+      // Load pending operations with user-specific key
+      final pendingKey = 'pending_operations_$currentUserId';
+      final pendingData = prefs.getStringList(pendingKey) ?? [];
+      print('📊 Found ${pendingData.length} pending operations for this user');
 
       pendingOperations.value =
           pendingData.map((jsonStr) {
@@ -154,6 +159,13 @@ class FuelingService extends GetxController {
   Future<void> _saveOfflineData() async {
     print('💾 Saving offline data...');
     try {
+      // Get current user ID for user-specific storage
+      final currentUserId = _authService.getCurrentUserId();
+      if (currentUserId.isEmpty) {
+        print('⚠️ No user ID available, skipping offline save');
+        return;
+      }
+
       final prefs = await SharedPreferences.getInstance();
       final jsonData =
           fuelingRecords.map((record) {
@@ -162,8 +174,12 @@ class FuelingService extends GetxController {
             return jsonEncode(jsonObj);
           }).toList();
 
-      await prefs.setStringList('offline_fueling_records', jsonData);
-      print('✅ Saved ${jsonData.length} records to offline storage');
+      // Use user-specific key for data isolation
+      final userSpecificKey = 'offline_fueling_records_$currentUserId';
+      await prefs.setStringList(userSpecificKey, jsonData);
+      print(
+        '✅ Saved ${jsonData.length} records to offline storage for user: $currentUserId',
+      );
     } catch (e) {
       print('❌ Error saving offline data: $e');
     }
@@ -173,6 +189,13 @@ class FuelingService extends GetxController {
     print('📝 Saving pending operation...');
     print('📊 Operation: $operation');
     try {
+      // Get current user ID for user-specific storage
+      final currentUserId = _authService.getCurrentUserId();
+      if (currentUserId.isEmpty) {
+        print('⚠️ No user ID available, skipping pending operation save');
+        return;
+      }
+
       pendingOperations.add(operation);
       final prefs = await SharedPreferences.getInstance();
       final jsonData =
@@ -181,8 +204,12 @@ class FuelingService extends GetxController {
             return jsonEncode(op);
           }).toList();
 
-      await prefs.setStringList('pending_operations', jsonData);
-      print('✅ Saved ${jsonData.length} pending operations');
+      // Use user-specific key for data isolation
+      final pendingKey = 'pending_operations_$currentUserId';
+      await prefs.setStringList(pendingKey, jsonData);
+      print(
+        '✅ Saved ${jsonData.length} pending operations for user: $currentUserId',
+      );
     } catch (e) {
       print('❌ Error saving pending operation: $e');
     }
@@ -193,13 +220,25 @@ class FuelingService extends GetxController {
     try {
       final prefs = await SharedPreferences.getInstance();
 
-      // Clear offline records
-      await prefs.remove('offline_fueling_records');
-      print('✅ Cleared offline fueling records');
+      // Get current user ID to clear user-specific data
+      final currentUserId = _authService.getCurrentUserId();
 
-      // Clear pending operations
+      if (currentUserId.isNotEmpty) {
+        // Clear user-specific offline records
+        final userSpecificKey = 'offline_fueling_records_$currentUserId';
+        await prefs.remove(userSpecificKey);
+        print('✅ Cleared user-specific offline fueling records');
+
+        // Clear user-specific pending operations
+        final pendingKey = 'pending_operations_$currentUserId';
+        await prefs.remove(pendingKey);
+        print('✅ Cleared user-specific pending operations');
+      }
+
+      // Clear legacy global keys (for backward compatibility)
+      await prefs.remove('offline_fueling_records');
       await prefs.remove('pending_operations');
-      print('✅ Cleared pending operations');
+      print('✅ Cleared legacy global keys');
 
       // Clear fuel entries from controller
       await prefs.remove('fuel_entries');
@@ -215,9 +254,13 @@ class FuelingService extends GetxController {
       print('✅ Cleared in-memory data');
 
       // Clear controller data if available
-      final mileageController = Get.find<MileageGetxController>();
-      mileageController.clearAllData();
-      print('✅ Cleared controller data');
+      try {
+        final mileageController = Get.find<MileageGetxController>();
+        mileageController.clearAllData();
+        print('✅ Cleared controller data');
+      } catch (e) {
+        print('ℹ️ MileageController not found or already cleared');
+      }
 
       print('🎉 All local data cleared successfully');
     } catch (e) {
@@ -249,9 +292,14 @@ class FuelingService extends GetxController {
         pendingOperations.remove(operation);
       }
 
-      // Clear pending operations
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setStringList('pending_operations', []);
+      // Clear pending operations with user-specific key
+      final currentUserId = _authService.getCurrentUserId();
+      if (currentUserId.isNotEmpty) {
+        final prefs = await SharedPreferences.getInstance();
+        final pendingKey = 'pending_operations_$currentUserId';
+        await prefs.setStringList(pendingKey, []);
+        print('✅ Cleared pending operations for user: $currentUserId');
+      }
     } catch (e) {
       print('Error processing pending operations: $e');
     }
@@ -722,8 +770,21 @@ class FuelingService extends GetxController {
   // Helper method to clear only offline data (not all local data)
   Future<void> _clearOfflineDataOnly() async {
     try {
+      final currentUserId = _authService.getCurrentUserId();
       final prefs = await SharedPreferences.getInstance();
+
+      // Clear user-specific offline data
+      if (currentUserId.isNotEmpty) {
+        final userSpecificKey = 'offline_fueling_records_$currentUserId';
+        await prefs.remove(userSpecificKey);
+        print(
+          '✅ Cleared user-specific offline fueling records: $userSpecificKey',
+        );
+      }
+
+      // Also clear legacy global key for backward compatibility
       await prefs.remove('offline_fueling_records');
+
       fuelingRecords.clear();
       print('✅ Offline fueling records cleared');
     } catch (e) {

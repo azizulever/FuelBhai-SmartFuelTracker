@@ -17,8 +17,13 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  // Initialize services
-  Get.put(AuthService());
+  // Initialize AuthService first and check guest mode
+  final authService = Get.put(AuthService());
+
+  // Wait for guest mode check to complete before initializing other services
+  await authService.checkGuestMode();
+
+  // Now initialize other services - they can properly detect guest mode
   Get.put(FuelingService());
   Get.put(ServiceTripSyncService());
 
