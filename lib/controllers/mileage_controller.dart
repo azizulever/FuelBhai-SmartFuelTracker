@@ -8,6 +8,7 @@ import 'package:mileage_calculator/models/trip_record.dart';
 import 'package:mileage_calculator/services/fueling_service.dart';
 import 'package:mileage_calculator/services/auth_service.dart';
 import 'package:mileage_calculator/services/service_trip_sync.dart';
+import 'package:mileage_calculator/services/trip_notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class MileageGetxController extends GetxController {
@@ -23,6 +24,7 @@ class MileageGetxController extends GetxController {
   late final FuelingService _fuelingService;
   late final AuthService _authService;
   late final ServiceTripSyncService _serviceTripSync;
+  late final TripNotificationService _notificationService;
 
   String get selectedVehicleType => _selectedVehicleType;
   List<String> get vehicleTypes => _vehicleTypes;
@@ -84,6 +86,10 @@ class MileageGetxController extends GetxController {
       print('✅ MileageController: Created new ServiceTripSyncService');
     }
 
+    // Initialize notification service
+    _notificationService = TripNotificationService();
+    _initializeNotifications();
+
     // Listen to service and trip records from sync service
     ever(_serviceTripSync.serviceRecords, (_) {
       _updateServiceRecordsFromSync();
@@ -103,6 +109,11 @@ class MileageGetxController extends GetxController {
     ever(_fuelingService.fuelingRecords, (_) {
       _updateFromFuelingService();
     });
+  }
+
+  Future<void> _initializeNotifications() async {
+    await _notificationService.initialize();
+    print('✅ MileageController: Initialized TripNotificationService');
   }
 
   void _updateServiceRecordsFromSync() {
@@ -702,6 +713,15 @@ class MileageGetxController extends GetxController {
     _tripRecords.insert(0, newTrip);
     _startTripTimer();
 
+    // Show notification immediately with trip start time
+    await _notificationService.showTripNotification(
+      tripId: newTrip.id,
+      duration: newTrip.duration,
+      totalCost: 0,
+      costEntriesCount: 0,
+      tripStartTime: newTrip.startTime,
+    );
+
     try {
       print('👤 Guest mode: ${_authService.isGuestMode.value}');
       await _serviceTripSync.addTripRecord(newTrip);
@@ -727,6 +747,20 @@ class MileageGetxController extends GetxController {
           vehicleType: _activeTrip!.vehicleType,
           isActive: _activeTrip!.isActive,
         );
+
+        // Update notification with current trip data
+        final totalCost = _activeTrip!.costEntries.fold<double>(
+          0,
+          (sum, entry) => sum + entry.amount,
+        );
+        _notificationService.showTripNotification(
+          tripId: _activeTrip!.id,
+          duration: _activeTrip!.duration,
+          totalCost: totalCost,
+          costEntriesCount: _activeTrip!.costEntries.length,
+          tripStartTime: _activeTrip!.startTime,
+        );
+
         update();
       }
     });
@@ -737,6 +771,9 @@ class MileageGetxController extends GetxController {
 
     _tripTimer?.cancel();
     _tripTimer = null;
+
+    // Cancel notification
+    await _notificationService.cancelTripNotification();
 
     final endTime = DateTime.now();
     final finalDuration = endTime.difference(_activeTrip!.startTime);
@@ -799,6 +836,19 @@ class MileageGetxController extends GetxController {
     if (index != -1) {
       _tripRecords[index] = _activeTrip!;
     }
+
+    // Update notification with new cost
+    final totalCost = _activeTrip!.costEntries.fold<double>(
+      0,
+      (sum, entry) => sum + entry.amount,
+    );
+    await _notificationService.showTripNotification(
+      tripId: _activeTrip!.id,
+      duration: _activeTrip!.duration,
+      totalCost: totalCost,
+      costEntriesCount: _activeTrip!.costEntries.length,
+      tripStartTime: _activeTrip!.startTime,
+    );
 
     try {
       await _serviceTripSync.updateTripRecord(_activeTrip!);

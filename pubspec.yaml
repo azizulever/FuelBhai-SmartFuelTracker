@@ -25,6 +25,9 @@ dependencies:
   # Google Sign-In
   google_sign_in: ^6.1.6
 
+  # Local Notifications
+  flutter_local_notifications: ^17.2.3
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
