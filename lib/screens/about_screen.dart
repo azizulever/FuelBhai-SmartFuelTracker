@@ -130,7 +130,7 @@ class AboutScreen extends StatelessWidget {
                 children: [
                   _buildPolicyItem(
                     'Data Collection',
-                    'TankiBhai collects fuel tracking data you manually enter (fuel amount, cost, mileage) and basic account information (name, email) when you create an account. We use Google Sign-In for secure authentication.',
+                    'FuelBhai collects fuel tracking data you manually enter (fuel amount, cost, mileage) and basic account information (name, email) when you create an account. We use Google Sign-In for secure authentication.',
                   ),
                   _buildPolicyItem(
                     'Data Storage',
@@ -167,7 +167,7 @@ class AboutScreen extends StatelessWidget {
                 children: [
                   _buildPolicyItem(
                     'App Features',
-                    'TankiBhai provides fuel consumption tracking, mileage calculation, cost analysis, and data synchronization across devices. The app supports both authenticated users and guest mode.',
+                    'FuelBhai provides fuel consumption tracking, mileage calculation, cost analysis, and data synchronization across devices. The app supports both authenticated users and guest mode.',
                   ),
                   _buildPolicyItem(
                     'Account Management',
@@ -179,7 +179,7 @@ class AboutScreen extends StatelessWidget {
                   ),
                   _buildPolicyItem(
                     'Copyright Notice',
-                    'TankiBhai app is developed by Azizul Islam. All rights reserved. Unauthorized copying, modification, or distribution of this app is strictly prohibited.',
+                    'FuelBhai app is developed by Azizul Islam. All rights reserved. Unauthorized copying, modification, or distribution of this app is strictly prohibited.',
                   ),
                   _buildPolicyItem(
                     'Disclaimer',
@@ -261,7 +261,7 @@ class AboutScreen extends StatelessWidget {
               child: Column(
                 children: [
                   const Text(
-                    'TankiBhai - Smart Fuel Tracker',
+                    'FuelBhai - Smart Fuel Tracker',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,

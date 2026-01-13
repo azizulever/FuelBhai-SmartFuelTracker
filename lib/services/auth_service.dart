@@ -526,7 +526,7 @@ class AuthService extends GetxController {
 
   // Helper method to get current user's data
   String getCurrentUserEmail() {
-    return _auth.currentUser?.email ?? 'guest@tankibhai.com';
+    return _auth.currentUser?.email ?? 'guest@fuelbhai.com';
   }
 
   String getCurrentUserName() {

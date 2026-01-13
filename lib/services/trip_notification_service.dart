@@ -182,7 +182,7 @@ class TripNotificationService {
       styleInformation: BigTextStyleInformation(
         'Duration: $durationText\nTotal Cost: ৳${totalCost.toStringAsFixed(2)}\nEntries: $costEntriesCount',
         contentTitle: 'Trip Ongoing',
-        summaryText: 'TankiBhai',
+        summaryText: 'FuelBhai',
         htmlFormatContent: false,
         htmlFormatContentTitle: false,
       ),
