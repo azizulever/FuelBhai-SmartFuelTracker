@@ -94,7 +94,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                   Center(
                     child: SvgPicture.asset(
                       'assets/svgs/Reset-password.svg',
-                      height: 280,
+                      height: MediaQuery.of(context).size.height * 0.32,
                       fit: BoxFit.contain,
                     ),
                   ),

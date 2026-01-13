@@ -125,7 +125,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   Center(
                     child: SvgPicture.asset(
                       'assets/svgs/sign-up.svg',
-                      height: 200,
+                      height: MediaQuery.of(context).size.height * 0.23,
                       fit: BoxFit.contain,
                     ),
                   ),
@@ -363,75 +363,57 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        Container(
-          constraints: const BoxConstraints(minHeight: 64, maxHeight: 64),
-          child: TextFormField(
-            controller: controller,
-            keyboardType: keyboardType,
-            obscureText: obscureText,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF1F1F1F),
-            ),
-            decoration: InputDecoration(
-              hintText: hint,
-              hintStyle: TextStyle(
-                color: Colors.grey[400],
-                fontSize: 16,
-                fontWeight: FontWeight.w400,
-              ),
-              filled: true,
-              fillColor: const Color(0xFFF8F9FA),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 20,
-                vertical: 20,
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
-                  color: Color(0xFFE5E7EB),
-                  width: 1,
-                ),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
-                  color: Color(0xFFE5E7EB),
-                  width: 1,
-                ),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
-                  color: Color(0xFF2563EB),
-                  width: 2,
-                ),
-              ),
-              errorBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
-                  color: Color(0xFFEF4444),
-                  width: 1,
-                ),
-              ),
-              focusedErrorBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
-                  color: Color(0xFFEF4444),
-                  width: 2,
-                ),
-              ),
-              suffixIcon:
-                  suffixIcon != null
-                      ? Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: suffixIcon,
-                      )
-                      : null,
-            ),
-            validator: validator,
+        TextFormField(
+          controller: controller,
+          keyboardType: keyboardType,
+          obscureText: obscureText,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF1F1F1F),
           ),
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: TextStyle(
+              color: Colors.grey[400],
+              fontSize: 16,
+              fontWeight: FontWeight.w400,
+            ),
+            filled: true,
+            fillColor: const Color(0xFFF8F9FA),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 20,
+              vertical: 20,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE5E7EB), width: 1),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE5E7EB), width: 1),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFF2563EB), width: 2),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 2),
+            ),
+            suffixIcon:
+                suffixIcon != null
+                    ? Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: suffixIcon,
+                    )
+                    : null,
+          ),
+          validator: validator,
         ),
       ],
     );
@@ -442,7 +424,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     return GestureDetector(
       onTap: () => setState(() => _selectedCurrency = code),
       child: Container(
-        height: 64,
+        height: MediaQuery.of(context).size.height * 0.075,
         decoration: BoxDecoration(
           color: isSelected ? const Color(0xFFEFF6FF) : Colors.white,
           border: Border.all(
@@ -478,7 +460,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     return GestureDetector(
       onTap: _showCurrencyDialog,
       child: Container(
-        height: 64,
+        height: MediaQuery.of(context).size.height * 0.075,
         decoration: BoxDecoration(
           color: Colors.white,
           border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
@@ -572,7 +554,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     required bool isLoading,
   }) {
     return SizedBox(
-      height: 56,
+      height: MediaQuery.of(context).size.height * 0.065,
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(10),
@@ -633,7 +615,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   Widget _buildGoogleButton() {
     return SizedBox(
-      height: 56,
+      height: MediaQuery.of(context).size.height * 0.065,
       child: OutlinedButton(
         onPressed: _authService.isLoading.value ? null : _signUpWithGoogle,
         style: OutlinedButton.styleFrom(

@@ -76,7 +76,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                   Center(
                     child: SvgPicture.asset(
                       'assets/svgs/Forgot-password-email-verification.svg',
-                      height: 280,
+                      height: MediaQuery.of(context).size.height * 0.32,
                       fit: BoxFit.contain,
                     ),
                   ),
@@ -124,93 +124,87 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                   const SizedBox(height: 12),
 
                   // Email Field
-                  Container(
-                    constraints: const BoxConstraints(
-                      minHeight: 64,
-                      maxHeight: 64,
+                  TextFormField(
+                    controller: _emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF1F1F1F),
                     ),
-                    child: TextFormField(
-                      controller: _emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      style: const TextStyle(
+                    decoration: InputDecoration(
+                      hintText: 'Enter your email',
+                      hintStyle: TextStyle(
+                        color: Colors.grey[400],
                         fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                        color: Color(0xFF1F1F1F),
+                        fontWeight: FontWeight.w400,
                       ),
-                      decoration: InputDecoration(
-                        hintText: 'Enter your email',
-                        hintStyle: TextStyle(
-                          color: Colors.grey[400],
-                          fontSize: 16,
-                          fontWeight: FontWeight.w400,
-                        ),
-                        filled: true,
-                        fillColor: const Color(0xFFF8F9FA),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 20,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFE5E7EB),
-                            width: 1,
-                          ),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFE5E7EB),
-                            width: 1,
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                            color: Color(0xFF2563EB),
-                            width: 2,
-                          ),
-                        ),
-                        errorBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFEF4444),
-                            width: 1,
-                          ),
-                        ),
-                        focusedErrorBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFEF4444),
-                            width: 2,
-                          ),
-                        ),
-                        suffixIcon: const Padding(
-                          padding: EdgeInsets.all(16.0),
-                          child: Icon(
-                            Icons.email_outlined,
-                            color: Color(0xFF2563EB),
-                            size: 24,
-                          ),
+                      filled: true,
+                      fillColor: const Color(0xFFF8F9FA),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 20,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                          color: Color(0xFFE5E7EB),
+                          width: 1,
                         ),
                       ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your email';
-                        }
-                        if (!GetUtils.isEmail(value)) {
-                          return 'Please enter a valid email';
-                        }
-                        return null;
-                      },
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                          color: Color(0xFFE5E7EB),
+                          width: 1,
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                          color: Color(0xFF2563EB),
+                          width: 2,
+                        ),
+                      ),
+                      errorBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                          color: Color(0xFFEF4444),
+                          width: 1,
+                        ),
+                      ),
+                      focusedErrorBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                          color: Color(0xFFEF4444),
+                          width: 2,
+                        ),
+                      ),
+                      suffixIcon: const Padding(
+                        padding: EdgeInsets.all(16.0),
+                        child: Icon(
+                          Icons.email_outlined,
+                          color: Color(0xFF2563EB),
+                          size: 24,
+                        ),
+                      ),
                     ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter your email';
+                      }
+                      if (!GetUtils.isEmail(value)) {
+                        return 'Please enter a valid email';
+                      }
+                      return null;
+                    },
                   ),
 
                   const SizedBox(height: 32),
 
                   // Submit Button
                   SizedBox(
-                    height: 56,
+                    height: MediaQuery.of(context).size.height * 0.065,
                     child: ElevatedButton(
                       onPressed: _isLoading ? null : _submitEmail,
                       style: ElevatedButton.styleFrom(

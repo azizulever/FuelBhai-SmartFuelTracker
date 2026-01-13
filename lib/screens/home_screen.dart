@@ -175,8 +175,8 @@ class HomePage extends StatelessWidget {
                     children: [
                       // Profile Avatar
                       Container(
-                        width: 50,
-                        height: 50,
+                        width: MediaQuery.of(context).size.width * 0.12,
+                        height: MediaQuery.of(context).size.width * 0.12,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           border: Border.all(color: primaryColor, width: 2),

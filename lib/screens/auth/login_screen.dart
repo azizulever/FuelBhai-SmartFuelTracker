@@ -6,7 +6,6 @@ import 'package:mileage_calculator/screens/auth/email_verification_screen.dart';
 import 'package:mileage_calculator/screens/auth/registration_screen.dart';
 import 'package:mileage_calculator/services/auth_service.dart';
 import 'package:mileage_calculator/widgets/main_navigation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -58,7 +57,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   // Illustration
                   Center(
                     child: Container(
-                      height: 220,
+                      height: MediaQuery.of(context).size.height * 0.26,
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: SvgPicture.asset(
                         'assets/svgs/sign-in SVG.svg',
@@ -137,10 +136,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       filled: true,
                       fillColor: const Color(0xFFF8F9FA),
-                      constraints: const BoxConstraints(
-                        minHeight: 64,
-                        maxHeight: 64,
-                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                         borderSide: const BorderSide(
@@ -234,10 +229,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       filled: true,
                       fillColor: const Color(0xFFF8F9FA),
-                      constraints: const BoxConstraints(
-                        minHeight: 64,
-                        maxHeight: 64,
-                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                         borderSide: const BorderSide(
@@ -310,7 +301,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   // Sign In Button with gradient and shadow
                   Obx(
                     () => SizedBox(
-                      height: 56,
+                      height: MediaQuery.of(context).size.height * 0.065,
                       child: Container(
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(10),
@@ -404,7 +395,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   // Google Sign In Button
                   Obx(
                     () => SizedBox(
-                      height: 56,
+                      height: MediaQuery.of(context).size.height * 0.065,
                       child: OutlinedButton(
                         onPressed:
                             _authService.isLoading.value

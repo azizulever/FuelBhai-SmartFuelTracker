@@ -142,11 +142,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Widget _buildPageContent(OnboardingPage page) {
+    final screenHeight = MediaQuery.of(context).size.height;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 40),
       child: Column(
         children: [
-          const SizedBox(height: 10),
+          SizedBox(height: screenHeight * 0.01),
 
           // SVG Illustration - more space for the image
           Expanded(
@@ -165,7 +167,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
           ),
 
-          const SizedBox(height: 50),
+          SizedBox(height: screenHeight * 0.04),
 
           // Title - cleaner typography
           Text(
@@ -198,7 +200,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
           ),
 
-          const SizedBox(height: 30),
+          SizedBox(height: screenHeight * 0.025),
         ],
       ),
     );
@@ -220,6 +222,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Widget _buildNextButton() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final buttonSize = screenWidth * 0.19;
+    final innerButtonSize = screenWidth * 0.16;
+
     // Calculate progress based on current page (0.33, 0.66, 1.0)
     final double progress = (_currentPage + 1) / _pages.length;
 
@@ -230,8 +236,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         children: [
           // Outer progress ring
           SizedBox(
-            width: 76,
-            height: 76,
+            width: buttonSize,
+            height: buttonSize,
             child: TweenAnimationBuilder<double>(
               duration: const Duration(milliseconds: 400),
               curve: Curves.easeInOut,
@@ -251,8 +257,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ),
           // Inner button
           Container(
-            width: 64,
-            height: 64,
+            width: innerButtonSize,
+            height: innerButtonSize,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: const Color(0xFF2563EB),

@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:mileage_calculator/widgets/main_navigation.dart';
-import 'package:mileage_calculator/screens/onboarding_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -38,6 +36,9 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final screenWidth = MediaQuery.of(context).size.width;
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: Center(
@@ -45,19 +46,19 @@ class _SplashScreenState extends State<SplashScreen>
           opacity: _animation,
           child: Column(
             children: [
-              const SizedBox(height: 300),
+              SizedBox(height: screenHeight * 0.35),
               Center(
                 child: SvgPicture.asset(
                   'assets/app_logo.svg',
-                  width: 120,
-                  height: 120,
+                  width: screenWidth * 0.28,
+                  height: screenWidth * 0.28,
                 ),
               ),
               Column(
                 children: [
                   const SizedBox(height: 5),
                   SizedBox(
-                    width: 100,
+                    width: screenWidth * 0.24,
                     child: Container(
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(16),
@@ -77,7 +78,7 @@ class _SplashScreenState extends State<SplashScreen>
                     'Smart Fuel Tracking',
                     style: TextStyle(fontSize: 14, color: Colors.black),
                   ),
-                  const SizedBox(height: 260),
+                  SizedBox(height: screenHeight * 0.30),
                   Text(
                     'Version: Beta',
                     style: TextStyle(

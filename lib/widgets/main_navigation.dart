@@ -91,7 +91,7 @@ class _MainNavigationState extends State<MainNavigation> {
         ),
         child: SafeArea(
           child: Container(
-            height: 70,
+            height: MediaQuery.of(context).size.height * 0.082,
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -106,6 +106,7 @@ class _MainNavigationState extends State<MainNavigation> {
                   label: 'Fueling',
                   index: 1,
                 ),
+                _buildCenterAddButton(),
                 _buildBottomNavItem(
                   icon: Icons.build_rounded,
                   label: 'Service',
@@ -116,7 +117,6 @@ class _MainNavigationState extends State<MainNavigation> {
                   label: 'Trip',
                   index: 3,
                 ),
-                _buildCenterAddButton(),
               ],
             ),
           ),
@@ -159,6 +159,8 @@ class _MainNavigationState extends State<MainNavigation> {
   }
 
   Widget _buildCenterAddButton() {
+    final buttonSize = MediaQuery.of(context).size.width * 0.14;
+
     return GestureDetector(
       onTap:
           () => showDialog(
@@ -168,8 +170,8 @@ class _MainNavigationState extends State<MainNavigation> {
                     EntryTypeSelectionDialog(controller: _mileageController),
           ),
       child: Container(
-        width: 56,
-        height: 56,
+        width: buttonSize,
+        height: buttonSize,
         decoration: BoxDecoration(
           color: Colors.white,
           shape: BoxShape.circle,
