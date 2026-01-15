@@ -14,6 +14,25 @@ class HomePage extends StatelessWidget {
 
   const HomePage({super.key, this.showBottomNav = true});
 
+  // Responsive helpers
+  double _getResponsivePadding(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    if (width < 360) return 12.0; // Small phones
+    if (width < 400) return 14.0; // Medium phones
+    return 16.0; // Large phones and tablets
+  }
+
+  double _getResponsiveFontSize(BuildContext context, double baseSize) {
+    final width = MediaQuery.of(context).size.width;
+    if (width < 360) return baseSize * 0.85; // Small phones
+    if (width < 400) return baseSize * 0.9; // Medium phones
+    return baseSize; // Large phones
+  }
+
+  bool _isSmallScreen(BuildContext context) {
+    return MediaQuery.of(context).size.width < 360;
+  }
+
   String _getGreeting() {
     final hour = DateTime.now().hour;
     if (hour < 12) {
@@ -27,6 +46,10 @@ class HomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final horizontalPadding = _getResponsivePadding(context);
+    final isSmall = _isSmallScreen(context);
+    final cardSpacing = isSmall ? 8.0 : 12.0;
+
     return GetBuilder<MileageGetxController>(
       init: MileageGetxController(),
       builder: (controller) {
@@ -38,7 +61,7 @@ class HomePage extends StatelessWidget {
                 // Custom Top Bar
                 _buildTopBar(context),
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
                   child: Divider(color: Colors.grey[300], thickness: 1),
                 ),
                 VehicleTypeSelector(
@@ -46,8 +69,8 @@ class HomePage extends StatelessWidget {
                   onVehicleTypeChanged: controller.updateSelectedVehicleType,
                 ),
                 Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: horizontalPadding,
                     vertical: 4,
                   ),
                   child: Column(
@@ -78,7 +101,7 @@ class HomePage extends StatelessWidget {
                               isBlue: true,
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          SizedBox(width: cardSpacing),
                           // Right Card: Latest Fuel Cost
                           Expanded(
                             child: _buildEnhancedStatCard(
@@ -107,18 +130,23 @@ class HomePage extends StatelessWidget {
                   ),
                 ),
 
-                const SizedBox(height: 12),
+                SizedBox(height: cardSpacing),
 
                 // Nearby Fuel Station Card
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
                   child: _buildNearbyFuelStationCard(context),
                 ),
 
-                const SizedBox(height: 12),
+                SizedBox(height: cardSpacing),
                 Expanded(
                   child: Container(
-                    margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    margin: EdgeInsets.fromLTRB(
+                      horizontalPadding,
+                      0,
+                      horizontalPadding,
+                      horizontalPadding,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(6),
@@ -144,13 +172,24 @@ class HomePage extends StatelessWidget {
   }
 
   Widget _buildTopBar(BuildContext context) {
+    final isSmall = _isSmallScreen(context);
+    final screenWidth = MediaQuery.of(context).size.width;
+    final horizontalPadding = _getResponsivePadding(context);
+
+    // Responsive avatar size
+    final avatarSize =
+        screenWidth < 360 ? 40.0 : (screenWidth < 400 ? 44.0 : 48.0);
+
     return FutureBuilder<Map<String, String>>(
       future: _getUserInfo(),
       builder: (context, snapshot) {
         final userInfo =
             snapshot.data ?? {'name': 'Guest User', 'initial': 'G'};
         return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: EdgeInsets.symmetric(
+            horizontal: horizontalPadding,
+            vertical: isSmall ? 10 : 12,
+          ),
           decoration: BoxDecoration(
             color: Colors.white,
             boxShadow: [
@@ -175,24 +214,27 @@ class HomePage extends StatelessWidget {
                     children: [
                       // Profile Avatar
                       Container(
-                        width: MediaQuery.of(context).size.width * 0.12,
-                        height: MediaQuery.of(context).size.width * 0.12,
+                        width: avatarSize,
+                        height: avatarSize,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          border: Border.all(color: primaryColor, width: 2),
+                          border: Border.all(
+                            color: primaryColor,
+                            width: isSmall ? 1.5 : 2,
+                          ),
                         ),
                         child: Center(
                           child: Text(
                             userInfo['initial']!.toUpperCase(),
-                            style: const TextStyle(
-                              fontSize: 18,
+                            style: TextStyle(
+                              fontSize: _getResponsiveFontSize(context, 18),
                               fontWeight: FontWeight.bold,
                               color: primaryColor,
                             ),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      SizedBox(width: isSmall ? 8 : 12),
                       // Greeting and Name
                       Expanded(
                         child: Column(
@@ -202,7 +244,7 @@ class HomePage extends StatelessWidget {
                             Text(
                               _getGreeting(),
                               style: TextStyle(
-                                fontSize: 14,
+                                fontSize: _getResponsiveFontSize(context, 14),
                                 color: Colors.grey[600],
                                 fontWeight: FontWeight.w400,
                               ),
@@ -210,8 +252,8 @@ class HomePage extends StatelessWidget {
                             const SizedBox(height: 2),
                             Text(
                               userInfo['name']!,
-                              style: const TextStyle(
-                                fontSize: 16,
+                              style: TextStyle(
+                                fontSize: _getResponsiveFontSize(context, 16),
                                 fontWeight: FontWeight.w600,
                                 color: Colors.black87,
                               ),
@@ -232,23 +274,25 @@ class HomePage extends StatelessWidget {
                   border: Border.all(color: Colors.grey[300]!, width: 1),
                 ),
                 child: IconButton(
+                  padding: EdgeInsets.all(isSmall ? 8 : 10),
+                  constraints: const BoxConstraints(),
                   onPressed: () {
                     Get.to(() => const NotificationScreen());
                   },
                   icon: Stack(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.notifications_outlined,
                         color: Colors.black87,
-                        size: 26,
+                        size: isSmall ? 22 : 24,
                       ),
-                      // Red dot indicator (optional, can be conditional based on unread notifications)
+                      // Red dot indicator
                       Positioned(
                         right: 0,
                         top: 0,
                         child: Container(
-                          width: 10,
-                          height: 10,
+                          width: isSmall ? 8 : 10,
+                          height: isSmall ? 8 : 10,
                           decoration: const BoxDecoration(
                             color: Colors.red,
                             shape: BoxShape.circle,
@@ -285,6 +329,23 @@ class HomePage extends StatelessWidget {
     required IconData icon,
     required bool isBlue,
   }) {
+    final isSmall = _isSmallScreen(context);
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    // Responsive sizing
+    final cardPadding =
+        screenWidth < 360 ? 10.0 : (screenWidth < 400 ? 12.0 : 14.0);
+    final borderRadius =
+        screenWidth < 360 ? 16.0 : (screenWidth < 400 ? 20.0 : 24.0);
+    final titleFontSize = _getResponsiveFontSize(context, 13);
+    final iconSize = screenWidth < 360 ? 16.0 : 18.0;
+    final iconPadding = screenWidth < 360 ? 6.0 : 8.0;
+    final mainValueSize =
+        screenWidth < 360 ? 32.0 : (screenWidth < 400 ? 36.0 : 40.0);
+    final unitFontSize = _getResponsiveFontSize(context, 13);
+    final avgLabelSize = _getResponsiveFontSize(context, 12);
+    final avgValueSize = screenWidth < 360 ? 15.0 : 16.0;
+
     // Split value into integer and decimal parts
     final parts = mainValue.split('.');
     final integerPart = parts[0];
@@ -295,10 +356,10 @@ class HomePage extends StatelessWidget {
     final avgDecimalPart = avgParts.length > 1 ? '.${avgParts[1]}' : '';
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(cardPadding),
       decoration: BoxDecoration(
         color: isBlue ? primaryColor : Colors.white,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(borderRadius),
         boxShadow: [
           BoxShadow(
             color:
@@ -306,8 +367,8 @@ class HomePage extends StatelessWidget {
                     ? primaryColor.withOpacity(0.3)
                     : Colors.grey.withOpacity(0.15),
             spreadRadius: 0,
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            blurRadius: isSmall ? 8 : 12,
+            offset: Offset(0, isSmall ? 2 : 4),
           ),
         ],
       ),
@@ -324,24 +385,24 @@ class HomePage extends StatelessWidget {
                 child: Text(
                   title,
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: titleFontSize,
                     fontWeight: FontWeight.w600,
                     color: isBlue ? Colors.white : Colors.black87,
                     letterSpacing: 0.2,
                   ),
-                  maxLines: 1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: isSmall ? 4 : 8),
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: EdgeInsets.all(iconPadding),
                 decoration: BoxDecoration(
                   color:
                       isBlue
                           ? Colors.white.withOpacity(0.2)
                           : primaryColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(isSmall ? 8 : 10),
                   border: Border.all(
                     color:
                         isBlue
@@ -353,13 +414,13 @@ class HomePage extends StatelessWidget {
                 child: Icon(
                   icon,
                   color: isBlue ? Colors.white : primaryColor,
-                  size: 18,
+                  size: iconSize,
                 ),
               ),
             ],
           ),
 
-          const SizedBox(height: 14),
+          SizedBox(height: isSmall ? 10 : 12),
 
           // Main Value Display with grayed decimal
           FittedBox(
@@ -371,34 +432,34 @@ class HomePage extends StatelessWidget {
                 Text(
                   integerPart,
                   style: TextStyle(
-                    fontSize: 44,
+                    fontSize: mainValueSize,
                     fontWeight: FontWeight.bold,
                     color: isBlue ? Colors.white : Colors.black,
                     height: 1,
-                    letterSpacing: -1.5,
+                    letterSpacing: -1.2,
                   ),
                 ),
                 if (decimalPart.isNotEmpty)
                   Text(
                     decimalPart,
                     style: TextStyle(
-                      fontSize: 44,
+                      fontSize: mainValueSize,
                       fontWeight: FontWeight.bold,
                       color:
                           isBlue
                               ? Colors.white.withOpacity(0.5)
                               : Colors.black.withOpacity(0.3),
                       height: 1,
-                      letterSpacing: -1.5,
+                      letterSpacing: -1.2,
                     ),
                   ),
-                const SizedBox(width: 4),
+                SizedBox(width: isSmall ? 2 : 4),
                 Padding(
-                  padding: const EdgeInsets.only(top: 6),
+                  padding: EdgeInsets.only(top: isSmall ? 4 : 5),
                   child: Text(
                     unit,
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: unitFontSize,
                       fontWeight: FontWeight.w500,
                       color:
                           isBlue
@@ -411,7 +472,7 @@ class HomePage extends StatelessWidget {
             ),
           ),
 
-          const SizedBox(height: 12),
+          SizedBox(height: isSmall ? 8 : 10),
 
           // Average Section
           FittedBox(
@@ -422,7 +483,7 @@ class HomePage extends StatelessWidget {
                 Text(
                   '$averageLabel: ',
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: avgLabelSize,
                     fontWeight: FontWeight.w500,
                     color:
                         isBlue
@@ -433,7 +494,7 @@ class HomePage extends StatelessWidget {
                 Text(
                   avgIntegerPart,
                   style: TextStyle(
-                    fontSize: 17,
+                    fontSize: avgValueSize,
                     fontWeight: FontWeight.bold,
                     color: isBlue ? Colors.white : Colors.black,
                     letterSpacing: -0.5,
@@ -443,7 +504,7 @@ class HomePage extends StatelessWidget {
                   Text(
                     avgDecimalPart,
                     style: TextStyle(
-                      fontSize: 17,
+                      fontSize: avgValueSize,
                       fontWeight: FontWeight.bold,
                       color:
                           isBlue
@@ -452,11 +513,11 @@ class HomePage extends StatelessWidget {
                       letterSpacing: -0.5,
                     ),
                   ),
-                const SizedBox(width: 3),
+                SizedBox(width: isSmall ? 2 : 3),
                 Text(
                   averageUnit,
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: avgLabelSize,
                     fontWeight: FontWeight.w500,
                     color:
                         isBlue
@@ -473,17 +534,34 @@ class HomePage extends StatelessWidget {
   }
 
   Widget _buildNearbyFuelStationCard(BuildContext context) {
+    final isSmall = _isSmallScreen(context);
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    // Responsive sizing
+    final cardPadding =
+        screenWidth < 360 ? 12.0 : (screenWidth < 400 ? 16.0 : 18.0);
+    final borderRadius =
+        screenWidth < 360 ? 10.0 : (screenWidth < 400 ? 12.0 : 14.0);
+    final iconBoxSize =
+        screenWidth < 360 ? 42.0 : (screenWidth < 400 ? 46.0 : 50.0);
+    final iconSize =
+        screenWidth < 360 ? 24.0 : (screenWidth < 400 ? 26.0 : 28.0);
+    final titleFontSize = _getResponsiveFontSize(context, 16);
+    final subtitleFontSize = _getResponsiveFontSize(context, 13);
+    final arrowSize = screenWidth < 360 ? 16.0 : 18.0;
+    final spacing = screenWidth < 360 ? 8.0 : 12.0;
+
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(cardPadding),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(borderRadius),
         boxShadow: [
           BoxShadow(
             color: Colors.grey.withOpacity(0.2),
             spreadRadius: 0,
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            blurRadius: isSmall ? 8 : 12,
+            offset: Offset(0, isSmall ? 2 : 4),
           ),
         ],
       ),
@@ -491,45 +569,49 @@ class HomePage extends StatelessWidget {
         children: [
           // Red location pin icon
           Container(
-            width: 50,
-            height: 50,
+            width: iconBoxSize,
+            height: iconBoxSize,
             decoration: BoxDecoration(
               color: const Color(0xFFFFEBEE),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(isSmall ? 10 : 12),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.location_on,
-              color: Color(0xFFE53935),
-              size: 28,
+              color: const Color(0xFFE53935),
+              size: iconSize,
             ),
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: spacing),
           // Text content
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Find nearby fuel station',
                   style: TextStyle(
-                    fontSize: 16,
+                    fontSize: titleFontSize,
                     fontWeight: FontWeight.w600,
                     color: Colors.black87,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: isSmall ? 2 : 4),
                 Text(
                   'View all stations within 20 km',
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: subtitleFontSize,
                     fontWeight: FontWeight.w400,
                     color: Colors.grey[600],
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: spacing),
           // Blue arrow button
           GestureDetector(
             onTap: () {
@@ -546,17 +628,20 @@ class HomePage extends StatelessWidget {
               );
             },
             child: Container(
-              width: 50,
-              height: 50,
+              width: iconBoxSize,
+              height: iconBoxSize,
               decoration: BoxDecoration(
                 color: const Color(0xFFF0F4FF),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: primaryColor, width: 1.5),
+                borderRadius: BorderRadius.circular(isSmall ? 10 : 12),
+                border: Border.all(
+                  color: primaryColor,
+                  width: isSmall ? 1.2 : 1.5,
+                ),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.arrow_forward_ios_rounded,
                 color: primaryColor,
-                size: 20,
+                size: arrowSize,
               ),
             ),
           ),

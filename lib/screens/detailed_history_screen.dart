@@ -21,112 +21,248 @@ class DetailedHistoryScreen extends StatefulWidget {
 class _DetailedHistoryScreenState extends State<DetailedHistoryScreen> {
   int _selectedTabIndex = 0;
 
+  // Responsive helpers
+  double _getResponsivePadding(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    if (width < 360) return 12.0;
+    if (width < 400) return 14.0;
+    return 16.0;
+  }
+
+  double _getResponsiveFontSize(BuildContext context, double baseSize) {
+    final width = MediaQuery.of(context).size.width;
+    if (width < 360) return baseSize * 0.85;
+    if (width < 400) return baseSize * 0.9;
+    return baseSize;
+  }
+
+  bool _isSmallScreen(BuildContext context) {
+    return MediaQuery.of(context).size.width < 360;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final horizontalPadding = _getResponsivePadding(context);
+    final isSmall = _isSmallScreen(context);
+
     return GetBuilder<MileageGetxController>(
       init: MileageGetxController(),
       builder: (controller) {
         return Scaffold(
-          appBar: AppBar(
-            title: Text(
-              '${controller.selectedVehicleType} Fueling Details',
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
-            ),
-            centerTitle: true,
-            backgroundColor: primaryColor,
-            foregroundColor: Colors.white,
-            elevation: 0,
-            leading:
-                widget.showBottomNav
-                    ? IconButton(
-                      icon: const Icon(Icons.arrow_back_rounded),
-                      onPressed: () => Navigator.of(context).pop(),
-                    )
-                    : null,
-          ),
-          body: Column(
-            children: [
-              // Statistics section
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.only(left: 16, right: 16, bottom: 12),
-                decoration: BoxDecoration(
-                  color: primaryColor,
-                  borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(16),
-                    bottomRight: Radius.circular(16),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: primaryColor.withOpacity(0.3),
-                      spreadRadius: 1,
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
+          backgroundColor: const Color(0xFFF5F5F5),
+          body: SafeArea(
+            child: Column(
+              children: [
+                // Unified Header Section
+                Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: primaryColor,
+                    borderRadius: const BorderRadius.only(
+                      bottomLeft: Radius.circular(30),
+                      bottomRight: Radius.circular(30),
                     ),
-                  ],
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 18, bottom: 8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: primaryColor.withOpacity(0.3),
+                        spreadRadius: 1,
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      // Back button and title
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          horizontalPadding,
+                          isSmall ? 10 : 12,
+                          horizontalPadding,
+                          isSmall ? 16 : 20,
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            if (widget.showBottomNav)
+                              GestureDetector(
+                                onTap: () => Get.back(),
+                                child: Container(
+                                  padding: EdgeInsets.all(isSmall ? 6 : 8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Icon(
+                                    Icons.arrow_back_ios_new_rounded,
+                                    color: Colors.white,
+                                    size: isSmall ? 18 : 20,
+                                  ),
+                                ),
+                              )
+                            else
+                              const SizedBox(width: 40),
+                            Text(
+                              '${controller.selectedVehicleType} Fueling',
+                              style: TextStyle(
+                                fontSize: _getResponsiveFontSize(context, 20),
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(width: 40),
+                          ],
+                        ),
+                      ),
+
+                      // Fuel Icon
+                      Container(
+                        padding: EdgeInsets.all(isSmall ? 16 : 20),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.local_gas_station_rounded,
+                          color: Colors.white,
+                          size: isSmall ? 40 : 48,
+                        ),
+                      ),
+
+                      SizedBox(height: isSmall ? 20 : 24),
+
+                      // Horizontal divider lines
+                      Stack(
+                        alignment: Alignment.center,
                         children: [
-                          _buildStatItem(
-                            title: 'Total Fuel',
-                            value:
-                                '${controller.getTotalFuel().toStringAsFixed(2)}L',
-                            icon: Icons.local_gas_station_rounded,
-                          ),
-                          _buildStatItem(
-                            title: 'Total Cost',
-                            value:
-                                '৳${controller.getTotalCost().toStringAsFixed(0)}',
-                            icon: Icons.payments_rounded,
-                          ),
-                          _buildStatItem(
-                            title: 'Total Distance',
-                            value:
-                                '${controller.getTotalDistance().toStringAsFixed(0)}KM',
-                            icon: Icons.map_rounded,
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Container(
+                                  height: 2,
+                                  margin: EdgeInsets.only(
+                                    left: isSmall ? 30 : 40,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        Colors.white.withOpacity(0),
+                                        Colors.white.withOpacity(0.5),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: Container(
+                                  height: 2,
+                                  margin: EdgeInsets.only(
+                                    right: isSmall ? 30 : 40,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        Colors.white.withOpacity(0.5),
+                                        Colors.white.withOpacity(0),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
+                      ),
+
+                      SizedBox(height: isSmall ? 20 : 24),
+
+                      // Statistics section
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          horizontalPadding,
+                          0,
+                          horizontalPadding,
+                          isSmall ? 20 : 24,
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            Expanded(
+                              child: _buildStatItem(
+                                context: context,
+                                title: 'Total\nFuel',
+                                value:
+                                    '${controller.getTotalFuel().toStringAsFixed(2)}L',
+                              ),
+                            ),
+                            Container(
+                              width: 1,
+                              height: isSmall ? 30 : 35,
+                              color: Colors.white30,
+                            ),
+                            Expanded(
+                              child: _buildStatItem(
+                                context: context,
+                                title: 'Total\nCost',
+                                value:
+                                    '${controller.getTotalCost().toStringAsFixed(0)}৳',
+                              ),
+                            ),
+                            Container(
+                              width: 1,
+                              height: isSmall ? 30 : 35,
+                              color: Colors.white30,
+                            ),
+                            Expanded(
+                              child: _buildStatItem(
+                                context: context,
+                                title: 'Total\nDistance',
+                                value:
+                                    '${controller.getTotalDistance().toStringAsFixed(0)}KM',
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
                 ),
-              ),
 
-              const SizedBox(height: 8),
-              CustomTabBar(
-                tabs: const ['All History', 'Best Cost', 'Best Mileage'],
-                onTabChanged: (index) {
-                  setState(() {
-                    _selectedTabIndex = index;
-                  });
-                },
-                initialIndex: _selectedTabIndex,
-              ),
-              const SizedBox(height: 4),
-              // Tab content
-              Expanded(
-                child:
-                    controller.filteredEntries.isEmpty
-                        ? EmptyHistoryPlaceholder(
-                          vehicleType: controller.selectedVehicleType,
-                        )
-                        : Container(
-                          margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: Colors.grey.shade200),
+                SizedBox(height: isSmall ? 8 : 10),
+                CustomTabBar(
+                  tabs: const ['All History', 'Best Cost', 'Best Mileage'],
+                  onTabChanged: (index) {
+                    setState(() {
+                      _selectedTabIndex = index;
+                    });
+                  },
+                  initialIndex: _selectedTabIndex,
+                ),
+                SizedBox(height: isSmall ? 4 : 6),
+                // Tab content
+                Expanded(
+                  child:
+                      controller.filteredEntries.isEmpty
+                          ? EmptyHistoryPlaceholder(
+                            vehicleType: controller.selectedVehicleType,
+                          )
+                          : Container(
+                            margin: EdgeInsets.fromLTRB(
+                              horizontalPadding,
+                              0,
+                              horizontalPadding,
+                              horizontalPadding,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: Colors.grey.shade200),
+                            ),
+                            child: _buildTabContent(controller),
                           ),
-                          child: _buildTabContent(controller),
-                        ),
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
           bottomNavigationBar:
               widget.showBottomNav
@@ -138,33 +274,44 @@ class _DetailedHistoryScreenState extends State<DetailedHistoryScreen> {
   }
 
   Widget _buildStatItem({
+    required BuildContext context,
     required String title,
     required String value,
-    required IconData icon,
   }) {
+    final isSmall = _isSmallScreen(context);
+    final labelFontSize = _getResponsiveFontSize(context, 11);
+    final valueFontSize = isSmall ? 16.0 : 18.0;
+
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(icon, color: Colors.white, size: 22),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            title,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            style: TextStyle(
+              fontSize: labelFontSize,
+              color: Colors.white70,
+              fontWeight: FontWeight.w500,
+              height: 1.2,
+            ),
           ),
         ),
-        const SizedBox(height: 2),
-        Text(
-          title,
-          style: TextStyle(fontSize: 10, color: Colors.white.withOpacity(0.8)),
+        SizedBox(height: isSmall ? 4 : 6),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            value,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: valueFontSize,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+              letterSpacing: -0.5,
+            ),
+          ),
         ),
       ],
     );

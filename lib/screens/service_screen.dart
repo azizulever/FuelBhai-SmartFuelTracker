@@ -17,8 +17,29 @@ class ServiceScreen extends StatefulWidget {
 class _ServiceScreenState extends State<ServiceScreen> {
   String _selectedFilter = 'All History';
 
+  // Responsive helpers
+  double _getResponsivePadding(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    if (width < 360) return 12.0;
+    if (width < 400) return 14.0;
+    return 16.0;
+  }
+
+  double _getResponsiveFontSize(BuildContext context, double baseSize) {
+    final width = MediaQuery.of(context).size.width;
+    if (width < 360) return baseSize * 0.85;
+    if (width < 400) return baseSize * 0.9;
+    return baseSize;
+  }
+
+  bool _isSmallScreen(BuildContext context) {
+    return MediaQuery.of(context).size.width < 360;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isSmall = _isSmallScreen(context);
+
     return GetBuilder<MileageGetxController>(
       init: MileageGetxController(),
       builder: (controller) {
@@ -32,12 +53,12 @@ class _ServiceScreenState extends State<ServiceScreen> {
                 // Top Header
                 _buildHeader(context, controller),
 
-                const SizedBox(height: 16),
+                SizedBox(height: isSmall ? 8 : 10),
 
                 // Filter Pills
                 _buildFilterPills(),
 
-                const SizedBox(height: 16),
+                SizedBox(height: isSmall ? 4 : 6),
 
                 // Service List
                 Expanded(
@@ -55,6 +76,9 @@ class _ServiceScreenState extends State<ServiceScreen> {
   }
 
   Widget _buildHeader(BuildContext context, MileageGetxController controller) {
+    final horizontalPadding = _getResponsivePadding(context);
+    final isSmall = _isSmallScreen(context);
+
     return Container(
       decoration: BoxDecoration(
         color: primaryColor,
@@ -62,58 +86,52 @@ class _ServiceScreenState extends State<ServiceScreen> {
           bottomLeft: Radius.circular(30),
           bottomRight: Radius.circular(30),
         ),
+        boxShadow: [
+          BoxShadow(
+            color: primaryColor.withOpacity(0.3),
+            spreadRadius: 1,
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Column(
         children: [
-          // Back button and title
+          // Title
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                GestureDetector(
-                  onTap: () => Get.back(),
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(
-                      Icons.arrow_back_ios_new_rounded,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                  ),
+            padding: EdgeInsets.fromLTRB(
+              horizontalPadding,
+              isSmall ? 10 : 12,
+              horizontalPadding,
+              isSmall ? 16 : 20,
+            ),
+            child: Center(
+              child: Text(
+                'Services',
+                style: TextStyle(
+                  fontSize: _getResponsiveFontSize(context, 20),
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
                 ),
-                const Text(
-                  'Services',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(width: 40),
-              ],
+              ),
             ),
           ),
 
           // Service Icon
           Container(
-            padding: const EdgeInsets.all(20),
+            padding: EdgeInsets.all(isSmall ? 16 : 20),
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.2),
               shape: BoxShape.circle,
             ),
-            child: const Icon(
+            child: Icon(
               Icons.build_rounded,
               color: Colors.white,
-              size: 48,
+              size: isSmall ? 40 : 48,
             ),
           ),
 
-          const SizedBox(height: 24),
+          SizedBox(height: isSmall ? 20 : 24),
 
           // Horizontal divider lines with icon
           Stack(
@@ -124,7 +142,7 @@ class _ServiceScreenState extends State<ServiceScreen> {
                   Expanded(
                     child: Container(
                       height: 2,
-                      margin: const EdgeInsets.only(left: 40),
+                      margin: EdgeInsets.only(left: isSmall ? 30 : 40),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
@@ -138,7 +156,7 @@ class _ServiceScreenState extends State<ServiceScreen> {
                   Expanded(
                     child: Container(
                       height: 2,
-                      margin: const EdgeInsets.only(right: 40),
+                      margin: EdgeInsets.only(right: isSmall ? 30 : 40),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
@@ -154,7 +172,7 @@ class _ServiceScreenState extends State<ServiceScreen> {
             ],
           ),
 
-          const SizedBox(height: 24),
+          SizedBox(height: isSmall ? 20 : 24),
 
           // Statistics Row
           Padding(
@@ -164,6 +182,7 @@ class _ServiceScreenState extends State<ServiceScreen> {
               children: [
                 Expanded(
                   child: _buildStatItem(
+                    context,
                     'Total\nService',
                     controller.totalServiceCount.toString(),
                   ),
@@ -171,6 +190,7 @@ class _ServiceScreenState extends State<ServiceScreen> {
                 Container(width: 1, height: 35, color: Colors.white30),
                 Expanded(
                   child: _buildStatItem(
+                    context,
                     'Total\nCost',
                     '${controller.totalServiceCost.toStringAsFixed(0)}৳',
                   ),
@@ -178,6 +198,7 @@ class _ServiceScreenState extends State<ServiceScreen> {
                 Container(width: 1, height: 35, color: Colors.white30),
                 Expanded(
                   child: _buildStatItem(
+                    context,
                     'Avg\nCost',
                     controller.totalServiceCount > 0
                         ? '${(controller.totalServiceCost / controller.totalServiceCount).toStringAsFixed(0)}৳'
@@ -294,7 +315,11 @@ class _ServiceScreenState extends State<ServiceScreen> {
     );
   }
 
-  Widget _buildStatItem(String label, String value) {
+  Widget _buildStatItem(BuildContext context, String label, String value) {
+    final isSmall = _isSmallScreen(context);
+    final labelFontSize = _getResponsiveFontSize(context, 11);
+    final valueFontSize = isSmall ? 16.0 : 18.0;
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -304,22 +329,22 @@ class _ServiceScreenState extends State<ServiceScreen> {
             label,
             textAlign: TextAlign.center,
             maxLines: 2,
-            style: const TextStyle(
-              fontSize: 11,
+            style: TextStyle(
+              fontSize: labelFontSize,
               color: Colors.white70,
               fontWeight: FontWeight.w500,
               height: 1.2,
             ),
           ),
         ),
-        const SizedBox(height: 6),
+        SizedBox(height: isSmall ? 4 : 6),
         FittedBox(
           fit: BoxFit.scaleDown,
           child: Text(
             value,
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 18,
+            style: TextStyle(
+              fontSize: valueFontSize,
               fontWeight: FontWeight.bold,
               color: Colors.white,
               letterSpacing: -0.5,
@@ -331,22 +356,45 @@ class _ServiceScreenState extends State<ServiceScreen> {
   }
 
   Widget _buildFilterPills() {
-    return Container(
-      height: 50,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        children: [
-          _buildFilterPill('All History'),
-          const SizedBox(width: 12),
-          _buildFilterPill('Major only'),
-          const SizedBox(width: 12),
-          _buildFilterPill('Minor only'),
-        ],
+    final horizontalPadding = _getResponsivePadding(context);
+    final isSmall = _isSmallScreen(context);
+
+    return Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal: horizontalPadding,
+        vertical: isSmall ? 2 : 2,
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.grey[200]!),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey[200]!,
+              spreadRadius: 1,
+              blurRadius: 2,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(3),
+          child: Row(
+            children: [
+              Expanded(child: _buildFilterPill('All History', isSmall)),
+              SizedBox(width: isSmall ? 3 : 4),
+              Expanded(child: _buildFilterPill('Major only', isSmall)),
+              SizedBox(width: isSmall ? 3 : 4),
+              Expanded(child: _buildFilterPill('Minor only', isSmall)),
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  Widget _buildFilterPill(String label) {
+  Widget _buildFilterPill(String label, bool isSmall) {
     final isSelected = _selectedFilter == label;
     return GestureDetector(
       onTap: () {
@@ -355,21 +403,27 @@ class _ServiceScreenState extends State<ServiceScreen> {
         });
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-        decoration: BoxDecoration(
-          color: isSelected ? primaryColor : Colors.white,
-          borderRadius: BorderRadius.circular(25),
-          border: Border.all(
-            color: isSelected ? primaryColor : Colors.grey[300]!,
-            width: 1,
-          ),
+        padding: EdgeInsets.symmetric(
+          horizontal: isSmall ? 12 : 16,
+          vertical: isSmall ? 7 : 9,
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-            color: isSelected ? Colors.white : Colors.grey[700],
+        decoration: BoxDecoration(
+          color: isSelected ? primaryColor.withOpacity(0.1) : Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: isSelected ? Border.all(color: primaryColor, width: 1) : null,
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: isSmall ? 13 : 14,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+              color: isSelected ? primaryColor : Colors.grey[700],
+              height: 1.0,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ),
