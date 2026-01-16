@@ -48,65 +48,35 @@ class _TripScreenState extends State<TripScreen> {
 
         return Scaffold(
           backgroundColor: const Color(0xFFF5F5F5),
+          appBar: AppBar(
+            backgroundColor: Colors.white,
+            elevation: 0,
+            centerTitle: true,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.black),
+              onPressed: () => Get.back(),
+            ),
+            title: const Text(
+              'Trips',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
+              ),
+            ),
+          ),
           body: SafeArea(
             child: Column(
               children: [
-                // Unified Header
-                Container(
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: primaryColor,
-                    borderRadius: const BorderRadius.only(
-                      bottomLeft: Radius.circular(30),
-                      bottomRight: Radius.circular(30),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: primaryColor.withOpacity(0.3),
-                        spreadRadius: 1,
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      horizontalPadding,
-                      isSmall ? 10 : 12,
-                      horizontalPadding,
-                      isSmall ? 16 : 20,
-                    ),
-                    child: Center(
-                      child: Text(
-                        'Trip Tracker',
-                        style: TextStyle(
-                          fontSize: _getResponsiveFontSize(context, 20),
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-
                 const SizedBox(height: 16),
-                const SizedBox(height: 16),
-                // Status Banner
-                _buildStatusBanner(isActive, isSmall),
-
-                // Timer/Duration Display
-                _buildTimerDisplay(isActive, activeTrip, isSmall),
-
-                // Cost Display
-                _buildCostDisplay(isActive, activeTrip, isSmall),
-
-                // Action Button
-                _buildActionButton(
+                // Top Status Card
+                _buildTopStatusCard(
                   context,
                   controller,
                   isActive,
                   activeTrip,
                   isSmall,
+                  horizontalPadding,
                 ),
 
                 SizedBox(height: isSmall ? 12 : 16),
@@ -128,6 +98,188 @@ class _TripScreenState extends State<TripScreen> {
         );
       },
     );
+  }
+
+  Widget _buildTopStatusCard(
+    BuildContext context,
+    MileageGetxController controller,
+    bool isActive,
+    TripRecord? trip,
+    bool isSmall,
+    double horizontalPadding,
+  ) {
+    // Determine status color and text
+    Color statusColor;
+    String statusText;
+    if (isActive) {
+      statusColor = Colors.green;
+      statusText = 'Active';
+    } else if (trip != null && trip.endTime != null) {
+      statusColor = primaryColor;
+      statusText = 'Completed';
+    } else {
+      statusColor = Colors.grey;
+      statusText = 'Ready to start';
+    }
+
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: horizontalPadding),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(isSmall ? 14 : 16),
+        border: Border.all(
+          color: primaryColor.withOpacity(0.3),
+          width: 2,
+        ),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(isSmall ? 18 : 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Status Row
+            Row(
+              children: [
+                Container(
+                  width: isSmall ? 10 : 12,
+                  height: isSmall ? 10 : 12,
+                  decoration: BoxDecoration(
+                    color: statusColor,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                SizedBox(width: isSmall ? 8 : 10),
+                Text(
+                  statusText,
+                  style: TextStyle(
+                    fontSize: isSmall ? 16 : 18,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+              ],
+            ),
+
+            // Duration Display (shown when active or completed)
+            if (isActive || (trip != null && trip.endTime != null)) ...[
+              SizedBox(height: isSmall ? 14 : 18),
+              Text(
+                'Duration',
+                style: TextStyle(
+                  fontSize: isSmall ? 13 : 14,
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+              SizedBox(height: isSmall ? 4 : 6),
+              Text(
+                _formatDuration(trip),
+                style: TextStyle(
+                  fontSize: isSmall ? 32 : 38,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                  height: 1.1,
+                ),
+              ),
+            ],
+
+            // Cost Display
+            SizedBox(height: isSmall ? 14 : 18),
+            Text(
+              'Total Cost',
+              style: TextStyle(
+                fontSize: isSmall ? 13 : 14,
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+            SizedBox(height: isSmall ? 4 : 6),
+            Text(
+              'tk ${(trip?.totalCost ?? 0.0).toStringAsFixed(2)}',
+              style: TextStyle(
+                fontSize: isSmall ? 28 : 34,
+                fontWeight: FontWeight.bold,
+                color: primaryColor,
+                height: 1.1,
+              ),
+            ),
+
+            // Entry count (if any)
+            if (trip != null && trip.costEntries.isNotEmpty) ...[
+              SizedBox(height: isSmall ? 6 : 8),
+              Text(
+                '${trip.costEntries.length} ${trip.costEntries.length == 1 ? 'entry' : 'entries'}',
+                style: TextStyle(
+                  fontSize: isSmall ? 12 : 13,
+                  color: Colors.grey[500],
+                ),
+              ),
+            ],
+
+            // Action Button
+            SizedBox(height: isSmall ? 20 : 24),
+            SizedBox(
+              width: double.infinity,
+              height: isSmall ? 50 : 56,
+              child: ElevatedButton(
+                onPressed: () {
+                  if (isActive) {
+                    _showStopTripConfirmation(context, controller);
+                  } else if (trip != null && trip.endTime != null) {
+                    controller.startTrip();
+                  } else {
+                    controller.startTrip();
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isActive ? Colors.red : primaryColor,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(isSmall ? 12 : 14),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      isActive
+                          ? Icons.stop_rounded
+                          : (trip != null && trip.endTime != null)
+                              ? Icons.add_rounded
+                              : Icons.play_arrow_rounded,
+                      size: isSmall ? 22 : 24,
+                    ),
+                    SizedBox(width: isSmall ? 6 : 8),
+                    Text(
+                      isActive
+                          ? 'Stop Trip'
+                          : (trip != null && trip.endTime != null)
+                              ? 'New Trip'
+                              : 'Start Trip',
+                      style: TextStyle(
+                        fontSize: isSmall ? 15 : 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatDuration(TripRecord? trip) {
+    if (trip == null) return '00:00:43';
+    final duration = trip.duration;
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes.remainder(60);
+    final seconds = duration.inSeconds.remainder(60);
+
+    return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 
   Widget _buildStatusBanner(bool isActive, bool isSmall) {
