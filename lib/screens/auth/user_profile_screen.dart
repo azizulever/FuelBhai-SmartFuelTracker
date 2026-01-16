@@ -2,8 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:mileage_calculator/screens/about_screen.dart';
 import 'package:mileage_calculator/screens/onboarding_screen.dart';
+import 'package:mileage_calculator/screens/privacy_policy_screen.dart';
+import 'package:mileage_calculator/screens/terms_conditions_screen.dart';
+import 'package:mileage_calculator/screens/contact_support_screen.dart';
+import 'package:mileage_calculator/screens/edit_name_screen.dart';
 import 'package:mileage_calculator/services/auth_service.dart';
 import 'package:mileage_calculator/utils/theme.dart';
+import 'package:mileage_calculator/widgets/main_navigation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -18,39 +23,19 @@ class UserProfileScreen extends StatefulWidget {
 }
 
 class _UserProfileScreenState extends State<UserProfileScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
-  final _emailController = TextEditingController();
+  String _userName = 'Guest User';
+  String _userEmail = 'guest@fuelbhai.com';
   late final AuthService _authService;
-
-  bool _isEditing = false;
 
   @override
   void initState() {
     super.initState();
-    // Use existing service or create if not found
     try {
       _authService = Get.find<AuthService>();
     } catch (e) {
       _authService = Get.put(AuthService());
     }
-
-    // Add listeners to update header when controllers change
-    _nameController.addListener(() {
-      if (mounted) setState(() {});
-    });
-    _emailController.addListener(() {
-      if (mounted) setState(() {});
-    });
-
     _loadUserData();
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _emailController.dispose();
-    super.dispose();
   }
 
   void _loadUserData() async {
@@ -58,31 +43,23 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       final User? currentUser = FirebaseAuth.instance.currentUser;
 
       if (currentUser != null) {
-        // Try to get the latest user data (in case it was updated elsewhere)
         await currentUser.reload();
-
-        // Now set text controller values and update UI
         setState(() {
-          _nameController.text = currentUser.displayName ?? 'Guest User';
-          _emailController.text = currentUser.email ?? 'guest@fuelbhai.com';
+          _userName = currentUser.displayName ?? 'Guest User';
+          _userEmail = currentUser.email ?? 'guest@fuelbhai.com';
         });
       } else {
-        // Fallback to SharedPreferences if no Firebase user (guest mode)
         final prefs = await SharedPreferences.getInstance();
         setState(() {
-          _nameController.text = prefs.getString('user_name') ?? 'Guest User';
-          _emailController.text =
-              prefs.getString('user_email') ?? 'guest@fuelbhai.com';
+          _userName = prefs.getString('user_name') ?? 'Guest User';
+          _userEmail = prefs.getString('user_email') ?? 'guest@fuelbhai.com';
         });
       }
     } catch (e) {
-      // Handle any errors
       print('Error loading user data: $e');
-
-      // Fallback values
       setState(() {
-        _nameController.text = 'Guest User';
-        _emailController.text = 'guest@fuelbhai.com';
+        _userName = 'Guest User';
+        _userEmail = 'guest@fuelbhai.com';
       });
     }
   }
@@ -90,452 +67,178 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey[50],
       appBar: AppBar(
         title: const Text(
           'Profile',
-          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 18,
+            color: Colors.black,
+          ),
         ),
-        backgroundColor: primaryColor,
-        foregroundColor: Colors.white,
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
         elevation: 0,
         centerTitle: true,
-        leading:
-            widget.showBottomNav
-                ? IconButton(
-                  icon: const Icon(Icons.arrow_back_rounded),
-                  onPressed: () => Navigator.of(context).pop(),
-                )
-                : null,
-        actions: [
-          if (!_isEditing)
-            IconButton(
-              onPressed: () {
-                setState(() {
-                  _isEditing = true;
-                });
-              },
-              icon: const Icon(Icons.edit_outlined),
-            ),
-        ],
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () {
+            Get.offAll(() => const MainNavigation(initialIndex: 0));
+          },
+        ),
       ),
-      body: Container(
-        color: Colors.grey[50],
+      body: SingleChildScrollView(
         child: Column(
           children: [
-            // Header section with user info
+            const SizedBox(height: 32),
+            
+            // Profile Avatar
             Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(24),
+              width: 120,
+              height: 120,
               decoration: BoxDecoration(
-                color: primaryColor,
-                borderRadius: const BorderRadius.only(
-                  bottomLeft: Radius.circular(16),
-                  bottomRight: Radius.circular(16),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: primaryColor.withOpacity(0.3),
-                    spreadRadius: 1,
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+                shape: BoxShape.circle,
+                border: Border.all(color: primaryColor, width: 3),
               ),
+              child: ClipOval(
+                child: Icon(
+                  Icons.person,
+                  size: 60,
+                  color: primaryColor,
+                ),
+              ),
+            ),
+            
+            const SizedBox(height: 16),
+            
+            // User Name
+            Text(
+              _userName,
+              style: const TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w600,
+                color: primaryColor,
+              ),
+            ),
+            
+            const SizedBox(height: 6),
+            
+            // User Email
+            Text(
+              _userEmail,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[600],
+              ),
+            ),
+            
+            const SizedBox(height: 40),
+            
+            // Menu Items
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Column(
                 children: [
-                  // Profile Avatar
-                  Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 3),
-                    ),
-                    child: Icon(
-                      Icons.person_rounded,
-                      size: 40,
-                      color: Colors.white,
-                    ),
+                  _buildMenuItem(
+                    icon: Icons.edit_outlined,
+                    title: 'Edit Name',
+                    onTap: () async {
+                      final result = await Get.to(
+                        () => EditNameScreen(currentName: _userName),
+                      );
+                      if (result != null) {
+                        _loadUserData();
+                      }
+                    },
                   ),
                   const SizedBox(height: 12),
-                  Text(
-                    _nameController.text.isNotEmpty
-                        ? _nameController.text
-                        : 'Guest User',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  _buildMenuItem(
+                    icon: Icons.shield_outlined,
+                    title: 'Privacy and Policy',
+                    onTap: () => Get.to(() => const PrivacyPolicyScreen()),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _emailController.text.isNotEmpty
-                        ? _emailController.text
-                        : 'guest@fuelbhai.com',
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.8),
-                      fontSize: 14,
-                    ),
+                  const SizedBox(height: 12),
+                  _buildMenuItem(
+                    icon: Icons.description_outlined,
+                    title: 'Terms and Conditions',
+                    onTap: () => Get.to(() => const TermsConditionsScreen()),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildMenuItem(
+                    icon: Icons.support_agent_outlined,
+                    title: 'Contact and Support',
+                    onTap: () => Get.to(() => const ContactSupportScreen()),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildMenuItem(
+                    icon: Icons.logout_rounded,
+                    title: 'Logout',
+                    onTap: _showLogoutDialog,
                   ),
                 ],
               ),
             ),
-
-            const SizedBox(height: 16),
-
-            // Form content
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey.shade200),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 10,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Personal Information',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: primaryColor,
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-
-                          // Name Field
-                          _buildInputField(
-                            controller: _nameController,
-                            label: 'Full Name',
-                            icon: Icons.person_outline,
-                            enabled: _isEditing,
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter your name';
-                              }
-                              return null;
-                            },
-                          ),
-
-                          const SizedBox(height: 20),
-
-                          // Email Field
-                          _buildInputField(
-                            controller: _emailController,
-                            label: 'Email Address',
-                            icon: Icons.email_outlined,
-                            enabled: false, // Email should not be editable
-                          ),
-
-                          const SizedBox(height: 32),
-
-                          if (_isEditing) ...[
-                            // Save Button
-                            Container(
-                              width: double.infinity,
-                              height: 52,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(12),
-                                gradient: LinearGradient(
-                                  colors: [
-                                    primaryColor,
-                                    primaryColor.withOpacity(0.8),
-                                  ],
-                                  begin: Alignment.centerLeft,
-                                  end: Alignment.centerRight,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: primaryColor.withOpacity(0.3),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
-                              ),
-                              child: ElevatedButton(
-                                onPressed: _saveProfile,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.transparent,
-                                  shadowColor: Colors.transparent,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                child: const Text(
-                                  'Save Changes',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                            ),
-
-                            const SizedBox(height: 16),
-
-                            // Cancel Button
-                            Container(
-                              width: double.infinity,
-                              height: 52,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.grey[300]!),
-                                color: Colors.white,
-                              ),
-                              child: OutlinedButton(
-                                onPressed: () {
-                                  setState(() {
-                                    _isEditing = false;
-                                  });
-                                  _loadUserData();
-                                },
-                                style: OutlinedButton.styleFrom(
-                                  side: BorderSide.none,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                child: const Text(
-                                  'Cancel',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.black87,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-
-                          const SizedBox(height: 40),
-
-                          // Logout Button
-                          Container(
-                            width: double.infinity,
-                            height: 52,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(12),
-                              color: Colors.red.withOpacity(0.1),
-                              border: Border.all(
-                                color: Colors.red.withOpacity(0.3),
-                              ),
-                            ),
-                            child: OutlinedButton.icon(
-                              onPressed: _showLogoutDialog,
-                              icon: const Icon(
-                                Icons.logout_rounded,
-                                color: Colors.red,
-                                size: 20,
-                              ),
-                              label: const Text(
-                                'Logout',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.red,
-                                ),
-                              ),
-                              style: OutlinedButton.styleFrom(
-                                side: BorderSide.none,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                            ),
-                          ),
-
-                          const SizedBox(height: 16),
-
-                          // About & Privacy Button
-                          Container(
-                            width: double.infinity,
-                            height: 52,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: primaryColor.withOpacity(0.3),
-                              ),
-                              color: primaryColor.withOpacity(0.05),
-                            ),
-                            child: OutlinedButton.icon(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => const AboutScreen(),
-                                  ),
-                                );
-                              },
-                              icon: const Icon(
-                                Icons.info_outline_rounded,
-                                color: primaryColor,
-                                size: 20,
-                              ),
-                              label: const Text(
-                                'About & Privacy',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: primaryColor,
-                                ),
-                              ),
-                              style: OutlinedButton.styleFrom(
-                                side: BorderSide.none,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                            ),
-                          ),
-
-                          const SizedBox(height: 20),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 16),
+            
+            const SizedBox(height: 32),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildInputField({
-    required TextEditingController controller,
-    required String label,
+  Widget _buildMenuItem({
     required IconData icon,
-    bool enabled = true,
-    String? Function(String?)? validator,
+    required String title,
+    required VoidCallback onTap,
   }) {
-    return Container(
-      decoration: BoxDecoration(
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(12),
-        boxShadow:
-            enabled
-                ? [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey.shade200),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: primaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  icon,
+                  color: primaryColor,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.black87,
                   ),
-                ]
-                : null,
-      ),
-      child: TextFormField(
-        controller: controller,
-        enabled: enabled,
-        validator: validator,
-        style: TextStyle(
-          fontSize: 15,
-          color: enabled ? Colors.black87 : Colors.grey[600],
-        ),
-        decoration: InputDecoration(
-          labelText: label,
-          labelStyle: TextStyle(
-            color: enabled ? Colors.grey[600] : Colors.grey[500],
-            fontSize: 14,
-          ),
-          prefixIcon: Icon(
-            icon,
-            color: enabled ? primaryColor : Colors.grey[500],
-            size: 20,
-          ),
-          filled: true,
-          fillColor: enabled ? Colors.white : Colors.grey[50],
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 16,
-          ),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none,
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.grey[200]!, width: 1),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: primaryColor, width: 2),
-          ),
-          disabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.grey[200]!, width: 1),
+                ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: Colors.grey[400],
+                size: 24,
+              ),
+            ],
           ),
         ),
       ),
     );
-  }
-
-  void _saveProfile() async {
-    if (_formKey.currentState!.validate()) {
-      try {
-        final User? currentUser = FirebaseAuth.instance.currentUser;
-
-        if (currentUser != null) {
-          // Update Firebase display name
-          await currentUser.updateDisplayName(_nameController.text.trim());
-
-          // Save to local storage as well
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('user_name', _nameController.text.trim());
-        } else {
-          // Only update local storage for guest users
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('user_name', _nameController.text.trim());
-        }
-
-        Get.snackbar(
-          'Success',
-          'Profile updated successfully',
-          backgroundColor: primaryColor,
-          colorText: Colors.white,
-          borderRadius: 12,
-          margin: const EdgeInsets.all(16),
-          snackPosition: SnackPosition.TOP,
-          icon: const Icon(Icons.check_circle, color: Colors.white),
-          shouldIconPulse: false,
-          duration: const Duration(seconds: 3),
-        );
-
-        if (mounted) {
-          setState(() {
-            _isEditing = false;
-          });
-        }
-      } catch (e) {
-        Get.snackbar(
-          'Error',
-          'Failed to update profile: ${e.toString()}',
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-          borderRadius: 12,
-          margin: const EdgeInsets.all(16),
-          snackPosition: SnackPosition.TOP,
-        );
-      }
-    }
   }
 
   void _showLogoutDialog() {

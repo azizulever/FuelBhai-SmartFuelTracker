@@ -58,6 +58,35 @@ class _MainNavigationState extends State<MainNavigation> {
     );
   }
 
+  // Responsive helpers
+  double _getNavBarHeight(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    if (screenWidth < 360) return 62.0; // Small phones
+    if (screenWidth < 400) return 65.0; // Medium phones
+    return 70.0; // Large phones
+  }
+
+  double _getIconSize(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    if (screenWidth < 360) return 20.0; // Small phones
+    if (screenWidth < 400) return 22.0; // Medium phones
+    return 24.0; // Large phones
+  }
+
+  double _getLabelFontSize(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    if (screenWidth < 360) return 10.0; // Small phones
+    if (screenWidth < 400) return 10.5; // Medium phones
+    return 11.5; // Large phones
+  }
+
+  double _getButtonSize(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    if (screenWidth < 360) return 54.0; // Small phones
+    if (screenWidth < 400) return 56.0; // Medium phones
+    return 60.0; // Large phones
+  }
+
   @override
   Widget build(BuildContext context) {
     print("Building MainNavigation with currentIndex: $_currentIndex");
@@ -83,39 +112,118 @@ class _MainNavigationState extends State<MainNavigation> {
           color: primaryColor,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, -2),
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 16,
+              offset: const Offset(0, -4),
+              spreadRadius: 0,
             ),
           ],
         ),
         child: SafeArea(
-          child: Container(
-            height: MediaQuery.of(context).size.height * 0.082,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          bottom: true,
+          child: SizedBox(
+            height: _getNavBarHeight(context),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  _buildBottomNavItem(
+                    context: context,
+                    icon: Icons.home_outlined,
+                    activeIcon: Icons.home_rounded,
+                    label: 'Home',
+                    index: 0,
+                  ),
+                  _buildBottomNavItem(
+                    context: context,
+                    icon: Icons.local_gas_station_outlined,
+                    activeIcon: Icons.local_gas_station_rounded,
+                    label: 'Fueling',
+                    index: 1,
+                  ),
+                  _buildCenterAddButton(context),
+                  _buildBottomNavItem(
+                    context: context,
+                    icon: Icons.build_outlined,
+                    activeIcon: Icons.build_rounded,
+                    label: 'Service',
+                    index: 2,
+                  ),
+                  _buildBottomNavItem(
+                    context: context,
+                    icon: Icons.location_on_outlined,
+                    activeIcon: Icons.location_on_rounded,
+                    label: 'Trip',
+                    index: 3,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomNavItem({
+    required BuildContext context,
+    required IconData icon,
+    required IconData activeIcon,
+    required String label,
+    required int index,
+  }) {
+    final isActive = _currentIndex == index;
+    final iconSize = _getIconSize(context);
+    final fontSize = _getLabelFontSize(context);
+
+    return Expanded(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _onNavItemTapped(index),
+          borderRadius: BorderRadius.circular(12),
+          splashColor: Colors.white.withOpacity(0.1),
+          highlightColor: Colors.white.withOpacity(0.05),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                _buildBottomNavItem(
-                  icon: Icons.home_outlined,
-                  label: 'Home',
-                  index: 0,
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeInOut,
+                  padding: EdgeInsets.all(isActive ? 3.0 : 0.0),
+                  decoration: BoxDecoration(
+                    color:
+                        isActive
+                            ? Colors.white.withOpacity(0.15)
+                            : Colors.transparent,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    isActive ? activeIcon : icon,
+                    color: Colors.white,
+                    size: iconSize,
+                  ),
                 ),
-                _buildBottomNavItem(
-                  icon: Icons.local_gas_station_rounded,
-                  label: 'Fueling',
-                  index: 1,
-                ),
-                _buildCenterAddButton(),
-                _buildBottomNavItem(
-                  icon: Icons.build_rounded,
-                  label: 'Service',
-                  index: 2,
-                ),
-                _buildBottomNavItem(
-                  icon: Icons.share_location_sharp,
-                  label: 'Trip',
-                  index: 3,
+                const SizedBox(height: 3),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: fontSize,
+                      fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+                      color: Colors.white,
+                      letterSpacing: 0,
+                      height: 1.1,
+                    ),
+                    maxLines: 1,
+                    textAlign: TextAlign.center,
+                  ),
                 ),
               ],
             ),
@@ -125,65 +233,62 @@ class _MainNavigationState extends State<MainNavigation> {
     );
   }
 
-  Widget _buildBottomNavItem({
-    required IconData icon,
-    required String label,
-    required int index,
-  }) {
-    final isActive = _currentIndex == index;
-    return GestureDetector(
-      onTap: () => _onNavItemTapped(index),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              color: isActive ? Colors.white : Colors.white.withOpacity(0.6),
-              size: 24,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-                color: isActive ? Colors.white : Colors.white.withOpacity(0.6),
-              ),
-            ),
+  Widget _buildCenterAddButton(BuildContext context) {
+    final buttonSize = _getButtonSize(context);
+    final iconSize = buttonSize * 0.45;
+
+    return Container(
+      width: buttonSize,
+      height: buttonSize,
+      margin: const EdgeInsets.symmetric(horizontal: 8.0),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white,
+            Colors.white.withOpacity(0.95),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildCenterAddButton() {
-    final buttonSize = MediaQuery.of(context).size.width * 0.14;
-
-    return GestureDetector(
-      onTap:
-          () => showDialog(
-            context: context,
-            builder:
-                (context) =>
-                    EntryTypeSelectionDialog(controller: _mileageController),
+        boxShadow: [
+          BoxShadow(
+            color: primaryColor.withOpacity(0.15),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+            spreadRadius: 0,
           ),
-      child: Container(
-        width: buttonSize,
-        height: buttonSize,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.2),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+            spreadRadius: 0,
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        shape: const CircleBorder(),
+        child: InkWell(
+          onTap:
+              () => showDialog(
+                context: context,
+                builder:
+                    (context) =>
+                        EntryTypeSelectionDialog(controller: _mileageController),
+              ),
+          borderRadius: BorderRadius.circular(buttonSize / 2),
+          splashColor: primaryColor.withOpacity(0.15),
+          highlightColor: primaryColor.withOpacity(0.08),
+          child: Center(
+            child: Icon(
+              Icons.add_rounded,
+              color: primaryColor,
+              size: iconSize,
+              weight: 2.0,
             ),
-          ],
+          ),
         ),
-        child: const Icon(Icons.add, color: primaryColor, size: 28),
       ),
     );
   }
