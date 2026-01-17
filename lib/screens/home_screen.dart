@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:mileage_calculator/controllers/mileage_controller.dart';
+import 'package:mileage_calculator/screens/nearby_stations_screen.dart';
 import 'package:mileage_calculator/screens/notification_screen.dart';
 import 'package:mileage_calculator/utils/theme.dart';
 import 'package:mileage_calculator/widgets/empty_history_placeholder.dart';
@@ -615,16 +616,12 @@ class HomePage extends StatelessWidget {
           // Blue arrow button
           GestureDetector(
             onTap: () {
-              // TODO: Navigate to Nearby Fuel Stations page with Google Maps
-              Get.snackbar(
-                'Coming Soon',
-                'Nearby fuel stations feature will be available soon!',
-                snackPosition: SnackPosition.BOTTOM,
-                backgroundColor: primaryColor,
-                colorText: Colors.white,
-                margin: const EdgeInsets.all(16),
-                borderRadius: 8,
-                duration: const Duration(seconds: 2),
+              // Navigate to Nearby Fuel Stations screen
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const NearbyStationsScreen(),
+                ),
               );
             },
             child: Container(
