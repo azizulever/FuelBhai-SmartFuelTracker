@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 import 'package:mileage_calculator/screens/auth/login_screen.dart';
+import 'package:mileage_calculator/screens/auth/signup_email_verification_screen.dart';
 import 'package:mileage_calculator/services/auth_service.dart';
 import 'package:mileage_calculator/widgets/main_navigation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -57,37 +58,50 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   Future<void> _signUp() async {
     if (_formKey.currentState!.validate()) {
-      final result = await _authService.registerWithEmail(
+      // Save selected currency
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('selected_currency', _selectedCurrency);
+
+      // Send verification code
+      final code = await _authService.sendEmailVerificationCode(
         _emailController.text.trim(),
         _passwordController.text,
-        name: _nameController.text.trim(),
+        _nameController.text.trim(),
       );
 
-      if (result) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('selected_currency', _selectedCurrency);
-
-        Get.snackbar(
-          'Success',
-          'Account created successfully!',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: const Color(0xFF10B981),
-          colorText: Colors.white,
+      if (code != null) {
+        // Navigate to verification screen
+        Get.to(
+          () => SignupEmailVerificationScreen(
+            email: _emailController.text.trim(),
+          ),
         );
-
-        Get.offAll(() => const MainNavigation());
       }
     }
   }
 
   Future<void> _signUpWithGoogle() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('selected_currency', _selectedCurrency);
+
     await _authService.signInWithGoogle();
 
     if (_authService.isLoggedIn.value) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('selected_currency', _selectedCurrency);
+      // Sign out immediately after Google sign-up
+      await _authService.signOut();
 
-      Get.offAll(() => const MainNavigation());
+      // Show success message and redirect to login
+      Get.snackbar(
+        'Success',
+        'Account created successfully! Please sign in.',
+        backgroundColor: const Color(0xFF10B981),
+        colorText: Colors.white,
+        borderRadius: 12,
+        margin: const EdgeInsets.all(16),
+        snackPosition: SnackPosition.TOP,
+      );
+
+      Get.offAll(() => const LoginScreen());
     }
   }
 

@@ -8,6 +8,9 @@ import 'package:mileage_calculator/services/service_trip_sync.dart';
 import 'package:mileage_calculator/services/local_storage_service.dart';
 import 'package:mileage_calculator/utils/theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:math';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class AuthService extends GetxController {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -20,6 +23,9 @@ class AuthService extends GetxController {
   RxString guestUserId = ''.obs;
 
   Rx<User?> user = Rx<User?>(null);
+
+  // Store verification data temporarily
+  final Map<String, Map<String, dynamic>> _verificationData = {};
 
   @override
   void onInit() {
@@ -137,6 +143,309 @@ class AuthService extends GetxController {
       );
 
       return false;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  /// Send a 6-digit verification code to the provided email via Cloud Function
+  Future<String?> sendEmailVerificationCode(
+    String email,
+    String password,
+    String name,
+  ) async {
+    try {
+      isLoading.value = true;
+
+      // Generate a random 6-digit code
+      final random = Random();
+      final code = (100000 + random.nextInt(900000)).toString();
+
+      // Store the verification data temporarily
+      _verificationData[email] = {
+        'code': code,
+        'password': password,
+        'name': name,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+      };
+
+      // Send email via Cloud Function
+      try {
+        // Replace with your actual Cloud Function URL
+        // Example: https://YOUR-REGION-YOUR-PROJECT-ID.cloudfunctions.net/sendVerificationEmail
+        final functionUrl = 'YOUR_CLOUD_FUNCTION_URL_HERE';
+
+        final response = await http.post(
+          Uri.parse(functionUrl),
+          headers: {'Content-Type': 'application/json'},
+          body: json.encode({'email': email, 'code': code, 'name': name}),
+        );
+
+        if (response.statusCode != 200) {
+          throw Exception('Failed to send email: ${response.body}');
+        }
+
+        Get.snackbar(
+          'Verification Code Sent',
+          'A 6-digit code has been sent to $email',
+          backgroundColor: primaryColor,
+          colorText: Colors.white,
+          borderRadius: 12,
+          margin: const EdgeInsets.all(16),
+          snackPosition: SnackPosition.TOP,
+          icon: const Icon(Icons.mail_outline, color: Colors.white),
+          shouldIconPulse: false,
+          duration: const Duration(seconds: 4),
+        );
+
+        return code;
+      } catch (emailError) {
+        print('❌ Email sending error: $emailError');
+        Get.snackbar(
+          'Error',
+          'Failed to send verification email. Please check your internet connection.',
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+          borderRadius: 12,
+          margin: const EdgeInsets.all(16),
+          snackPosition: SnackPosition.TOP,
+        );
+        return null;
+      }
+    } catch (e) {
+      Get.snackbar(
+        'Error',
+        'Failed to send verification code. Please try again.',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        borderRadius: 12,
+        margin: const EdgeInsets.all(16),
+        snackPosition: SnackPosition.TOP,
+      );
+      return null;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  /// Verify the email code and complete registration
+  Future<bool> verifyEmailCodeAndRegister(String email, String code) async {
+    try {
+      isLoading.value = true;
+
+      // Check if we have verification data for this email
+      if (!_verificationData.containsKey(email)) {
+        Get.snackbar(
+          'Error',
+          'No verification request found. Please request a new code.',
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+          borderRadius: 12,
+          margin: const EdgeInsets.all(16),
+          snackPosition: SnackPosition.TOP,
+        );
+        return false;
+      }
+
+      final data = _verificationData[email]!;
+      final storedCode = data['code'] as String;
+      final password = data['password'] as String;
+      final name = data['name'] as String;
+      final timestamp = data['timestamp'] as int;
+
+      // Check if code is expired (10 minutes)
+      final now = DateTime.now().millisecondsSinceEpoch;
+      if (now - timestamp > 600000) {
+        // 10 minutes in milliseconds
+        _verificationData.remove(email);
+        Get.snackbar(
+          'Code Expired',
+          'The verification code has expired. Please request a new one.',
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+          borderRadius: 12,
+          margin: const EdgeInsets.all(16),
+          snackPosition: SnackPosition.TOP,
+        );
+        return false;
+      }
+
+      // Verify the code
+      if (code != storedCode) {
+        Get.snackbar(
+          'Invalid Code',
+          'The verification code is incorrect. Please try again.',
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+          borderRadius: 12,
+          margin: const EdgeInsets.all(16),
+          snackPosition: SnackPosition.TOP,
+        );
+        return false;
+      }
+
+      // Code is correct, now create the user account
+      UserCredential userCredential = await _auth
+          .createUserWithEmailAndPassword(email: email, password: password);
+
+      // Update display name
+      if (name.isNotEmpty) {
+        await userCredential.user?.updateDisplayName(name);
+      }
+
+      // Remove verification data
+      _verificationData.remove(email);
+
+      // Sign out immediately after registration
+      await _auth.signOut();
+
+      Get.snackbar(
+        'Success',
+        'Email verified! Please sign in with your credentials.',
+        backgroundColor: const Color(0xFF10B981),
+        colorText: Colors.white,
+        borderRadius: 12,
+        margin: const EdgeInsets.all(16),
+        snackPosition: SnackPosition.TOP,
+        icon: const Icon(Icons.check_circle, color: Colors.white),
+        shouldIconPulse: false,
+        duration: const Duration(seconds: 3),
+      );
+
+      return true;
+    } on FirebaseAuthException catch (e) {
+      String errorMessage;
+
+      switch (e.code) {
+        case 'email-already-in-use':
+          errorMessage = 'This email is already registered.';
+          break;
+        case 'weak-password':
+          errorMessage = 'The password is too weak.';
+          break;
+        case 'invalid-email':
+          errorMessage = 'The email address is invalid.';
+          break;
+        default:
+          errorMessage = 'An error occurred during registration.';
+      }
+
+      Get.snackbar(
+        'Registration Error',
+        errorMessage,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        borderRadius: 12,
+        margin: const EdgeInsets.all(16),
+        snackPosition: SnackPosition.TOP,
+      );
+
+      return false;
+    } catch (e) {
+      Get.snackbar(
+        'Error',
+        'An unexpected error occurred. Please try again.',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        borderRadius: 12,
+        margin: const EdgeInsets.all(16),
+        snackPosition: SnackPosition.TOP,
+      );
+
+      return false;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  /// Resend verification code
+  Future<String?> resendVerificationCode(String email) async {
+    try {
+      isLoading.value = true;
+
+      // Check if we have previous verification data
+      if (!_verificationData.containsKey(email)) {
+        Get.snackbar(
+          'Error',
+          'No previous verification request found.',
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+          borderRadius: 12,
+          margin: const EdgeInsets.all(16),
+          snackPosition: SnackPosition.TOP,
+        );
+        return null;
+      }
+
+      final data = _verificationData[email]!;
+      final password = data['password'] as String;
+      final name = data['name'] as String;
+
+      // Generate a new code
+      final random = Random();
+      final code = (100000 + random.nextInt(900000)).toString();
+
+      // Update verification data with new code and timestamp
+      _verificationData[email] = {
+        'code': code,
+        'password': password,
+        'name': name,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+      };
+
+      // Send email via Cloud Function
+      try {
+        // Replace with your actual Cloud Function URL
+        final functionUrl = 'YOUR_CLOUD_FUNCTION_URL_HERE';
+
+        final response = await http.post(
+          Uri.parse(functionUrl),
+          headers: {'Content-Type': 'application/json'},
+          body: json.encode({'email': email, 'code': code, 'name': name}),
+        );
+
+        if (response.statusCode != 200) {
+          throw Exception('Failed to send email: ${response.body}');
+        }
+
+        Get.snackbar(
+          'Code Resent',
+          'A new 6-digit code has been sent to $email',
+          backgroundColor: primaryColor,
+          colorText: Colors.white,
+          borderRadius: 12,
+          margin: const EdgeInsets.all(16),
+          snackPosition: SnackPosition.TOP,
+          icon: const Icon(Icons.mail_outline, color: Colors.white),
+          shouldIconPulse: false,
+          duration: const Duration(seconds: 4),
+        );
+
+        return code;
+      } catch (emailError) {
+        print('❌ Email sending error: $emailError');
+        Get.snackbar(
+          'Error',
+          'Failed to send verification email. Please try again.',
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+          borderRadius: 12,
+          margin: const EdgeInsets.all(16),
+          snackPosition: SnackPosition.TOP,
+        );
+        return null;
+      }
+    } catch (e) {
+      Get.snackbar(
+        'Error',
+        'Failed to resend code. Please try again.',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        borderRadius: 12,
+        margin: const EdgeInsets.all(16),
+        snackPosition: SnackPosition.TOP,
+      );
+      return null;
     } finally {
       isLoading.value = false;
     }
