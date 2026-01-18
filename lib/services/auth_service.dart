@@ -231,12 +231,15 @@ class AuthService extends GetxController {
 
   Future<String> signInWithGoogle() async {
     try {
+      isLoading.value = true;
+
       // Sign out first to ensure clean state
       await GoogleSignIn().signOut();
 
       final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
 
       if (googleUser == null) {
+        isLoading.value = false;
         return 'Sign-in aborted by user';
       }
 
@@ -278,8 +281,10 @@ class AuthService extends GetxController {
       );
 
       print('Successfully logged in');
+      isLoading.value = false;
       return 'Success';
     } on FirebaseAuthException catch (e) {
+      isLoading.value = false;
       print('FirebaseAuthException: ${e.message}');
       Get.snackbar(
         'Authentication Error',
@@ -295,6 +300,7 @@ class AuthService extends GetxController {
       );
       return 'FirebaseAuthException: ${e.message}';
     } on Exception catch (e) {
+      isLoading.value = false;
       print('Exception: $e');
 
       // Check for specific Google Sign-In errors

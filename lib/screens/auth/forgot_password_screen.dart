@@ -56,7 +56,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             key: _formKey,
             child: Column(
               children: [
-                const SizedBox(height: 40),
+                const SizedBox(height: 24),
 
                 // Icon
                 Container(
@@ -73,7 +73,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   ),
                 ),
 
-                const SizedBox(height: 32),
+                const SizedBox(height: 24),
 
                 const Text(
                   'Forgot Password?',
@@ -85,7 +85,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   textAlign: TextAlign.center,
                 ),
 
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
 
                 Text(
                   'Don\'t worry! Enter your email address and we\'ll send you a link to reset your password.',
@@ -97,7 +97,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   textAlign: TextAlign.center,
                 ),
 
-                const SizedBox(height: 40),
+                const SizedBox(height: 24),
 
                 // Email Field
                 Container(
@@ -163,13 +163,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   ),
                 ),
 
-                const SizedBox(height: 32),
+                const SizedBox(height: 20),
 
                 // Send Reset Email Button
                 Obx(
                   () => Container(
                     width: double.infinity,
-                    height: 52,
+                    height: 56,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
                       gradient: LinearGradient(
@@ -217,7 +217,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   ),
                 ),
 
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
 
                 // Back to Sign In
                 TextButton(

@@ -98,18 +98,18 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const SizedBox(height: 40),
+                const SizedBox(height: 24),
 
                 // Illustration
                 Center(
                   child: SvgPicture.asset(
                     'assets/svgs/Forgot-password-otp-verification.svg',
-                    height: MediaQuery.of(context).size.height * 0.32,
+                    height: MediaQuery.of(context).size.height * 0.26,
                     fit: BoxFit.contain,
                   ),
                 ),
 
-                const SizedBox(height: 40),
+                const SizedBox(height: 24),
 
                 // Title
                 const Text(
@@ -123,7 +123,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
                   textAlign: TextAlign.center,
                 ),
 
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
 
                 // Subtitle
                 Text(
@@ -137,7 +137,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
                   textAlign: TextAlign.center,
                 ),
 
-                const SizedBox(height: 40),
+                const SizedBox(height: 24),
 
                 // OTP Code Label
                 const Text(
@@ -149,7 +149,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
                   ),
                 ),
 
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
 
                 // OTP Input Fields
                 Row(
@@ -206,7 +206,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
                   ),
                 ),
 
-                const SizedBox(height: 32),
+                const SizedBox(height: 20),
 
                 // Verify Button
                 SizedBox(
@@ -247,7 +247,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
                   ),
                 ),
 
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
 
                 // Back to Email Verification Button
                 SizedBox(
@@ -286,7 +286,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 40),
+                const SizedBox(height: 20),
               ],
             ),
           ),

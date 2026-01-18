@@ -70,18 +70,18 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 24),
 
                   // Illustration
                   Center(
                     child: SvgPicture.asset(
                       'assets/svgs/Forgot-password-email-verification.svg',
-                      height: MediaQuery.of(context).size.height * 0.32,
+                      height: MediaQuery.of(context).size.height * 0.26,
                       fit: BoxFit.contain,
                     ),
                   ),
 
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 24),
 
                   // Title
                   const Text(
@@ -95,7 +95,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                     textAlign: TextAlign.center,
                   ),
 
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
 
                   // Subtitle
                   Text(
@@ -109,7 +109,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                     textAlign: TextAlign.center,
                   ),
 
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 24),
 
                   // Email Label
                   const Text(
@@ -121,7 +121,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 6),
 
                   // Email Field
                   TextFormField(
@@ -142,8 +142,8 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                       filled: true,
                       fillColor: const Color(0xFFF8F9FA),
                       contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 20,
+                        horizontal: 16,
+                        vertical: 16,
                       ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -200,11 +200,11 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                     },
                   ),
 
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 20),
 
                   // Submit Button
                   SizedBox(
-                    height: MediaQuery.of(context).size.height * 0.065,
+                    height: 56,
                     child: ElevatedButton(
                       onPressed: _isLoading ? null : _submitEmail,
                       style: ElevatedButton.styleFrom(
@@ -241,7 +241,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
 
                   // Back to Login Button
                   SizedBox(
@@ -281,7 +281,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 20),
                 ],
               ),
             ),

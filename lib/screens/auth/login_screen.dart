@@ -52,12 +52,12 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 16),
 
                   // Illustration
                   Center(
                     child: Container(
-                      height: MediaQuery.of(context).size.height * 0.26,
+                      height: MediaQuery.of(context).size.height * 0.22,
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: SvgPicture.asset(
                         'assets/svgs/sign-in SVG.svg',
@@ -70,7 +70,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 16),
 
                   // Welcome Back Title
                   const Text(
@@ -83,7 +83,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     textAlign: TextAlign.center,
                   ),
 
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
 
                   // Subtitle
                   Text(
@@ -96,7 +96,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     textAlign: TextAlign.center,
                   ),
 
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 20),
 
                   // Email Label
                   const Text(
@@ -108,7 +108,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
 
                   // Email TextField
                   TextFormField(
@@ -172,15 +172,15 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 20,
+                        horizontal: 16,
+                        vertical: 16,
                       ),
                       errorStyle: const TextStyle(height: 0.8, fontSize: 12),
                       errorMaxLines: 1,
                     ),
                   ),
 
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 14),
 
                   // Password Label
                   const Text(
@@ -192,7 +192,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
 
                   // Password TextField
                   TextFormField(
@@ -265,8 +265,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 20,
+                        horizontal: 16,
+                        vertical: 16,
                       ),
                       errorStyle: const TextStyle(height: 0.8, fontSize: 12),
                       errorMaxLines: 1,
@@ -296,12 +296,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
 
                   // Sign In Button with gradient and shadow
                   Obx(
                     () => SizedBox(
-                      height: MediaQuery.of(context).size.height * 0.065,
+                      height: 56,
                       child: Container(
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(10),
@@ -365,7 +365,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
 
                   // Divider
                   Row(
@@ -390,12 +390,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     ],
                   ),
 
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
 
                   // Google Sign In Button
                   Obx(
                     () => SizedBox(
-                      height: MediaQuery.of(context).size.height * 0.065,
+                      height: 56,
                       child: OutlinedButton(
                         onPressed:
                             _authService.isLoading.value
@@ -436,7 +436,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
 
                   // Continue Without Account
                   Center(
@@ -460,7 +460,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
 
                   // Sign Up Link
                   Row(
@@ -475,7 +475,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       GestureDetector(
-                        onTap: () => Get.off(() => const RegistrationScreen()),
+                        onTap: () => Get.to(() => const RegistrationScreen()),
                         child: const Text(
                           'Sign Up',
                           style: TextStyle(
@@ -489,7 +489,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ],
                   ),
 
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
                 ],
               ),
             ),

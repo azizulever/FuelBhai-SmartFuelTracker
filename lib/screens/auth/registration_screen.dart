@@ -121,15 +121,15 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 12),
                   Center(
                     child: SvgPicture.asset(
                       'assets/svgs/sign-up.svg',
-                      height: MediaQuery.of(context).size.height * 0.23,
+                      height: MediaQuery.of(context).size.height * 0.2,
                       fit: BoxFit.contain,
                     ),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 20),
                   const Text(
                     'Welcome to FuelBhai!',
                     style: TextStyle(
@@ -140,7 +140,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
                   Text(
                     'Create your free account to start tracking\nmileage, fuel costs, and efficiency.',
                     style: TextStyle(
@@ -151,7 +151,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 20),
 
                   // Name Field
                   _buildTextField(
@@ -166,7 +166,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     },
                   ),
 
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 14),
 
                   // Email Field
                   _buildTextField(
@@ -190,7 +190,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     },
                   ),
 
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 14),
 
                   // Password Field
                   _buildTextField(
@@ -223,7 +223,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     },
                   ),
 
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
 
                   // Currency Selection
                   const Text(
@@ -234,7 +234,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                       color: Color(0xFF1F1F1F),
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
                   Row(
                     children: [
                       Expanded(
@@ -262,7 +262,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     ],
                   ),
 
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 20),
 
                   // Sign Up Button
                   Obx(
@@ -273,7 +273,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
 
                   // Divider
                   Row(
@@ -298,12 +298,12 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     ],
                   ),
 
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
 
                   // Google Sign Up Button
                   Obx(() => _buildGoogleButton()),
 
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
 
                   // Sign In Link
                   Row(
@@ -332,7 +332,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     ],
                   ),
 
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 20),
                 ],
               ),
             ),
@@ -362,7 +362,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
             color: Color(0xFF1F1F1F),
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 6),
         TextFormField(
           controller: controller,
           keyboardType: keyboardType,
@@ -382,8 +382,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
             filled: true,
             fillColor: const Color(0xFFF8F9FA),
             contentPadding: const EdgeInsets.symmetric(
-              horizontal: 20,
-              vertical: 20,
+              horizontal: 16,
+              vertical: 16,
             ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -405,13 +405,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               borderRadius: BorderRadius.circular(12),
               borderSide: const BorderSide(color: Color(0xFFEF4444), width: 2),
             ),
-            suffixIcon:
-                suffixIcon != null
-                    ? Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: suffixIcon,
-                    )
-                    : null,
+            suffixIcon: suffixIcon,
           ),
           validator: validator,
         ),
@@ -424,7 +418,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     return GestureDetector(
       onTap: () => setState(() => _selectedCurrency = code),
       child: Container(
-        height: MediaQuery.of(context).size.height * 0.075,
+        height: 56,
         decoration: BoxDecoration(
           color: isSelected ? const Color(0xFFEFF6FF) : Colors.white,
           border: Border.all(
@@ -460,7 +454,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     return GestureDetector(
       onTap: _showCurrencyDialog,
       child: Container(
-        height: MediaQuery.of(context).size.height * 0.075,
+        height: 56,
         decoration: BoxDecoration(
           color: Colors.white,
           border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
@@ -554,7 +548,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     required bool isLoading,
   }) {
     return SizedBox(
-      height: MediaQuery.of(context).size.height * 0.065,
+      height: 56,
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(10),
@@ -615,7 +609,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   Widget _buildGoogleButton() {
     return SizedBox(
-      height: MediaQuery.of(context).size.height * 0.065,
+      height: 56,
       child: OutlinedButton(
         onPressed: _authService.isLoading.value ? null : _signUpWithGoogle,
         style: OutlinedButton.styleFrom(
