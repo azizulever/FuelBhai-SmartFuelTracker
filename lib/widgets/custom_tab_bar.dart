@@ -41,7 +41,7 @@ class _CustomTabBarState extends State<CustomTabBar> {
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(25),
           border: Border.all(color: Colors.grey[200]!),
           boxShadow: [
             BoxShadow(
@@ -87,7 +87,7 @@ class _CustomTabBarState extends State<CustomTabBar> {
           ),
           decoration: BoxDecoration(
             color: isSelected ? primaryColor.withOpacity(0.1) : Colors.white,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(25),
             border:
                 isSelected ? Border.all(color: primaryColor, width: 1) : null,
           ),

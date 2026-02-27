@@ -154,7 +154,9 @@ class HomePage extends StatelessWidget {
                       border: Border.all(color: Colors.grey.shade200),
                     ),
                     child:
-                        controller.filteredEntries.isEmpty
+                        controller.filteredEntries.isEmpty &&
+                                controller.filteredServiceRecords.isEmpty &&
+                                controller.completedTrips.isEmpty
                             ? EmptyHistoryPlaceholder(
                               vehicleType: controller.selectedVehicleType,
                             )
@@ -280,27 +282,10 @@ class HomePage extends StatelessWidget {
                   onPressed: () {
                     Get.to(() => const NotificationScreen());
                   },
-                  icon: Stack(
-                    children: [
-                      Icon(
-                        Icons.notifications_outlined,
-                        color: Colors.black87,
-                        size: isSmall ? 22 : 24,
-                      ),
-                      // Red dot indicator
-                      Positioned(
-                        right: 0,
-                        top: 0,
-                        child: Container(
-                          width: isSmall ? 8 : 10,
-                          height: isSmall ? 8 : 10,
-                          decoration: const BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                      ),
-                    ],
+                  icon: Icon(
+                    Icons.notifications_outlined,
+                    color: Colors.black87,
+                    size: isSmall ? 22 : 24,
                   ),
                 ),
               ),

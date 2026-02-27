@@ -21,14 +21,12 @@ class MainNavigation extends StatefulWidget {
 
 class _MainNavigationState extends State<MainNavigation> {
   late int _currentIndex;
-  late PageController _pageController;
   late MileageGetxController _mileageController;
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
-    _pageController = PageController(initialPage: _currentIndex);
 
     // Try to find existing controller first, create if not found
     try {
@@ -41,21 +39,11 @@ class _MainNavigationState extends State<MainNavigation> {
     print("MainNavigation initialized with index: $_currentIndex");
   }
 
-  @override
-  void dispose() {
-    _pageController.dispose();
-    super.dispose();
-  }
-
   void _onNavItemTapped(int index) {
+    if (_currentIndex == index) return;
     setState(() {
       _currentIndex = index;
     });
-    _pageController.animateToPage(
-      index,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-    );
   }
 
   // Responsive helpers
@@ -91,19 +79,22 @@ class _MainNavigationState extends State<MainNavigation> {
   Widget build(BuildContext context) {
     print("Building MainNavigation with currentIndex: $_currentIndex");
     return Scaffold(
-      body: PageView(
-        controller: _pageController,
-        physics: const NeverScrollableScrollPhysics(),
-        onPageChanged: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
+      body: IndexedStack(
+        index: _currentIndex,
         children: [
           HomePage(showBottomNav: false), // 0 - Home
-          DetailedHistoryScreen(showBottomNav: false), // 1 - Fueling
-          ServiceScreen(showBottomNav: false), // 2 - Service
-          TripScreen(showBottomNav: false), // 3 - Trip
+          DetailedHistoryScreen(
+            showBottomNav: false,
+            onBack: () => _onNavItemTapped(0),
+          ), // 1 - Fueling
+          ServiceScreen(
+            showBottomNav: false,
+            onBack: () => _onNavItemTapped(0),
+          ), // 2 - Service
+          TripScreen(
+            showBottomNav: false,
+            onBack: () => _onNavItemTapped(0),
+          ), // 3 - Trip
           UserProfileScreen(showBottomNav: false), // 4 - Profile (from top bar)
         ],
       ),
@@ -124,7 +115,10 @@ class _MainNavigationState extends State<MainNavigation> {
           child: SizedBox(
             height: _getNavBarHeight(context),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 8.0,
+                vertical: 8.0,
+              ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 crossAxisAlignment: CrossAxisAlignment.center,
@@ -153,8 +147,8 @@ class _MainNavigationState extends State<MainNavigation> {
                   ),
                   _buildBottomNavItem(
                     context: context,
-                    icon: Icons.location_on_outlined,
-                    activeIcon: Icons.location_on_rounded,
+                    icon: Icons.share_location_outlined,
+                    activeIcon: Icons.share_location_rounded,
                     label: 'Trip',
                     index: 3,
                   ),
@@ -246,10 +240,7 @@ class _MainNavigationState extends State<MainNavigation> {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Colors.white,
-            Colors.white.withOpacity(0.95),
-          ],
+          colors: [Colors.white, Colors.white.withOpacity(0.95)],
         ),
         boxShadow: [
           BoxShadow(
@@ -274,8 +265,9 @@ class _MainNavigationState extends State<MainNavigation> {
               () => showDialog(
                 context: context,
                 builder:
-                    (context) =>
-                        EntryTypeSelectionDialog(controller: _mileageController),
+                    (context) => EntryTypeSelectionDialog(
+                      controller: _mileageController,
+                    ),
               ),
           borderRadius: BorderRadius.circular(buttonSize / 2),
           splashColor: primaryColor.withOpacity(0.15),

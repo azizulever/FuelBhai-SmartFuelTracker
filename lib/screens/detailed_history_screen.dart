@@ -10,9 +10,13 @@ import 'package:mileage_calculator/widgets/main_navigation.dart';
 
 class DetailedHistoryScreen extends StatefulWidget {
   final bool showBottomNav;
+  final VoidCallback? onBack;
 
-  const DetailedHistoryScreen({Key? key, this.showBottomNav = true})
-    : super(key: key);
+  const DetailedHistoryScreen({
+    Key? key,
+    this.showBottomNav = true,
+    this.onBack,
+  }) : super(key: key);
 
   @override
   State<DetailedHistoryScreen> createState() => _DetailedHistoryScreenState();
@@ -84,24 +88,25 @@ class _DetailedHistoryScreenState extends State<DetailedHistoryScreen> {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            if (widget.showBottomNav)
-                              GestureDetector(
-                                onTap: () => Get.back(),
-                                child: Container(
-                                  padding: EdgeInsets.all(isSmall ? 6 : 8),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.2),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Icon(
-                                    Icons.arrow_back_ios_new_rounded,
-                                    color: Colors.white,
-                                    size: isSmall ? 18 : 20,
-                                  ),
+                            GestureDetector(
+                              onTap:
+                                  () =>
+                                      widget.onBack != null
+                                          ? widget.onBack!()
+                                          : Get.back(),
+                              child: Container(
+                                padding: EdgeInsets.all(isSmall ? 6 : 8),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
-                              )
-                            else
-                              const SizedBox(width: 40),
+                                child: Icon(
+                                  Icons.arrow_back_ios_new_rounded,
+                                  color: Colors.white,
+                                  size: isSmall ? 18 : 20,
+                                ),
+                              ),
+                            ),
                             Text(
                               '${controller.selectedVehicleType} Fueling',
                               style: TextStyle(
@@ -110,7 +115,7 @@ class _DetailedHistoryScreenState extends State<DetailedHistoryScreen> {
                                 color: Colors.white,
                               ),
                             ),
-                            const SizedBox(width: 40),
+                            SizedBox(width: isSmall ? 34 : 38),
                           ],
                         ),
                       ),

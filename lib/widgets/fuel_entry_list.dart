@@ -26,7 +26,7 @@ class CombinedEntry {
   });
 }
 
-class FuelEntryList extends StatelessWidget {
+class FuelEntryList extends StatefulWidget {
   final List<FuelEntry> entries;
   final MileageGetxController controller;
   final String listType; // "all", "recent", or "best"
@@ -44,6 +44,24 @@ class FuelEntryList extends StatelessWidget {
     this.showTripRecords = true, // Default to true for home screen
     Key? key,
   }) : super(key: key);
+
+  @override
+  State<FuelEntryList> createState() => _FuelEntryListState();
+}
+
+class _FuelEntryListState extends State<FuelEntryList> {
+  final ScrollController _scrollController = ScrollController();
+
+  List<FuelEntry> get entries => widget.entries;
+  MileageGetxController get controller => widget.controller;
+  bool get showServiceRecords => widget.showServiceRecords;
+  bool get showTripRecords => widget.showTripRecords;
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -86,32 +104,83 @@ class FuelEntryList extends StatelessWidget {
       }
     }
 
-    // Sort by date (newest first)
+    // Sort by date (newest first) — base order for all tabs
     combinedList.sort((a, b) => b.date.compareTo(a.date));
 
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      itemCount: combinedList.length,
-      separatorBuilder:
-          (context, index) =>
-              Divider(height: 1, thickness: 1, color: Colors.grey[300]!),
-      itemBuilder: (context, index) {
-        final combinedEntry = combinedList[index];
+    // Apply tab-specific sorting for fuel-only views
+    if (widget.listType == 'best_cost') {
+      // Sort by cost-per-litre ascending (cheapest/best first)
+      // Entries without fuel data go to the end
+      combinedList.sort((a, b) {
+        if (a.entryType != 'fuel' && b.entryType != 'fuel') return 0;
+        if (a.entryType != 'fuel') return 1;
+        if (b.entryType != 'fuel') return -1;
+        final fa = a.fuelEntry!;
+        final fb = b.fuelEntry!;
+        if (fa.fuelAmount <= 0 && fb.fuelAmount <= 0) return 0;
+        if (fa.fuelAmount <= 0) return 1;
+        if (fb.fuelAmount <= 0) return -1;
+        final costA = fa.fuelCost / fa.fuelAmount;
+        final costB = fb.fuelCost / fb.fuelAmount;
+        return costA.compareTo(costB); // ascending = best (lowest) cost first
+      });
+    } else if (widget.listType == 'best_mileage') {
+      // Pre-calculate mileage for each fuel entry using the original date-sorted entries list
+      // (entries are sorted newest-first, so entries[i+1] is the previous chronological entry)
+      final fuelOnlyInOrder =
+          entries; // already filtered by vehicle type, date-sorted newest-first
+      double? _calcMileage(FuelEntry current) {
+        final idx = fuelOnlyInOrder.indexOf(current);
+        if (idx < 0 || idx >= fuelOnlyInOrder.length - 1) return null;
+        final prev = fuelOnlyInOrder[idx + 1];
+        final dist = current.odometer - prev.odometer;
+        if (dist <= 0 || current.fuelAmount <= 0) return null;
+        return dist / current.fuelAmount;
+      }
 
-        switch (combinedEntry.entryType) {
-          case 'fuel':
-            return _buildFuelEntryCard(context, combinedEntry.fuelEntry!);
-          case 'service':
-            return _buildServiceEntryCard(
-              context,
-              combinedEntry.serviceRecord!,
-            );
-          case 'trip':
-            return _buildTripEntryCard(context, combinedEntry.tripRecord!);
-          default:
-            return const SizedBox.shrink();
-        }
-      },
+      combinedList.sort((a, b) {
+        if (a.entryType != 'fuel' && b.entryType != 'fuel') return 0;
+        if (a.entryType != 'fuel') return 1;
+        if (b.entryType != 'fuel') return -1;
+        final mA = _calcMileage(a.fuelEntry!);
+        final mB = _calcMileage(b.fuelEntry!);
+        if (mA == null && mB == null) return 0;
+        if (mA == null) return 1; // null (first entry) goes to end
+        if (mB == null) return -1;
+        return mB.compareTo(mA); // descending = best (highest) mileage first
+      });
+    }
+
+    return Scrollbar(
+      controller: _scrollController,
+      thumbVisibility: true,
+      thickness: 4,
+      radius: const Radius.circular(8),
+      child: ListView.separated(
+        controller: _scrollController,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        itemCount: combinedList.length,
+        separatorBuilder:
+            (context, index) =>
+                Divider(height: 1, thickness: 1, color: Colors.grey[300]!),
+        itemBuilder: (context, index) {
+          final combinedEntry = combinedList[index];
+
+          switch (combinedEntry.entryType) {
+            case 'fuel':
+              return _buildFuelEntryCard(context, combinedEntry.fuelEntry!);
+            case 'service':
+              return _buildServiceEntryCard(
+                context,
+                combinedEntry.serviceRecord!,
+              );
+            case 'trip':
+              return _buildTripEntryCard(context, combinedEntry.tripRecord!);
+            default:
+              return const SizedBox.shrink();
+          }
+        },
+      ),
     );
   }
 
@@ -250,15 +319,10 @@ class FuelEntryList extends StatelessWidget {
             height: 42,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color:
-                  isMajor ? const Color(0xFFFFEBEE) : const Color(0xFFFFF3E0),
+              color: const Color(0xFFF0F4FF),
             ),
             child: Center(
-              child: Icon(
-                Icons.build_rounded,
-                color: isMajor ? Colors.red : Colors.orange,
-                size: 22,
-              ),
+              child: Icon(Icons.build_rounded, color: primaryColor, size: 22),
             ),
           ),
 
@@ -272,52 +336,43 @@ class FuelEntryList extends StatelessWidget {
                       'Service',
                       style: TextStyle(
                         fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.black,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Text(
-                      DateFormat('MMM d, yyyy').format(service.serviceDate),
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Row(
-                  children: [
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: isMajor ? Colors.red : Colors.orange,
-                        borderRadius: BorderRadius.circular(4),
+                        color:
+                            isMajor
+                                ? const Color(0xFFFFEBEE)
+                                : const Color(0xFFFFF3E0),
+                        borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
                         service.serviceType,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.white,
+                        style: TextStyle(
+                          fontSize: 11,
                           fontWeight: FontWeight.w600,
+                          color: isMajor ? Colors.red : Colors.orange,
                         ),
                       ),
                     ),
                   ],
                 ),
+                const SizedBox(height: 4),
+                Text(
+                  DateFormat('MMM dd, yyyy').format(service.serviceDate),
+                  style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                ),
                 const SizedBox(height: 2),
                 Text(
-                  'Odo: ${service.odometerReading.toStringAsFixed(0)} km',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey[600],
-                    fontWeight: FontWeight.w400,
-                  ),
+                  'Odo: ${service.odometerReading.toStringAsFixed(2)} km',
+                  style: TextStyle(fontSize: 13, color: Colors.grey[600]),
                 ),
               ],
             ),
@@ -337,19 +392,12 @@ class FuelEntryList extends StatelessWidget {
               const SizedBox(height: 2),
               Text(
                 'Total Cost',
-                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                style: TextStyle(fontSize: 11, color: Colors.grey[600]),
               ),
-
-              Padding(
-                padding: const EdgeInsets.only(top: 6.0),
-                child: GestureDetector(
-                  onTap: () => _showServiceOptions(context, service),
-                  child: Icon(
-                    Icons.more_vert,
-                    color: Colors.grey[600],
-                    size: 20,
-                  ),
-                ),
+              const SizedBox(height: 8),
+              GestureDetector(
+                onTap: () => _showServiceOptions(context, service),
+                child: Icon(Icons.more_vert, color: Colors.grey[400], size: 20),
               ),
             ],
           ),
@@ -381,12 +429,12 @@ class FuelEntryList extends StatelessWidget {
             height: 42,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: const Color(0xFFE3F2FD),
+              color: const Color(0xFFF0F4FF),
             ),
             child: Center(
               child: Icon(
                 Icons.share_location_sharp,
-                color: Colors.blue[700],
+                color: primaryColor,
                 size: 22,
               ),
             ),
@@ -502,36 +550,6 @@ class FuelEntryList extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                ListTile(
-                  leading: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(Icons.visibility, color: Colors.blue),
-                  ),
-                  title: const Text('View Trip Details'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    Get.offAll(() => const MainNavigation(initialIndex: 3));
-                  },
-                ),
-                ListTile(
-                  leading: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(Icons.edit, color: Colors.orange),
-                  ),
-                  title: const Text('Edit Trip'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _showEditTripDialog(context, trip);
-                  },
-                ),
                 ListTile(
                   leading: Container(
                     padding: const EdgeInsets.all(8),

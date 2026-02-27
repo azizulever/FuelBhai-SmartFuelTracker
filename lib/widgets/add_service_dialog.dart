@@ -482,8 +482,19 @@ class _AddServiceDialogState extends State<AddServiceDialog>
   void _submitForm() {
     if (_formKey.currentState!.validate()) {
       try {
+        final parsed = DateTime.parse(dateController.text);
+        final now = DateTime.now();
+        final entryDate = DateTime(
+          parsed.year,
+          parsed.month,
+          parsed.day,
+          now.hour,
+          now.minute,
+          now.second,
+          now.millisecond,
+        );
         widget.controller.addServiceEntry(
-          DateTime.parse(dateController.text),
+          entryDate,
           double.parse(odometerController.text),
           double.parse(totalCostController.text),
           _selectedServiceType,

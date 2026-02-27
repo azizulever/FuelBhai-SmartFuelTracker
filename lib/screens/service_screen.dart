@@ -4,18 +4,28 @@ import 'package:intl/intl.dart';
 import 'package:mileage_calculator/controllers/mileage_controller.dart';
 import 'package:mileage_calculator/models/service_record.dart';
 import 'package:mileage_calculator/utils/theme.dart';
+import 'package:mileage_calculator/widgets/custom_tab_bar.dart';
 
 class ServiceScreen extends StatefulWidget {
   final bool showBottomNav;
+  final VoidCallback? onBack;
 
-  const ServiceScreen({Key? key, this.showBottomNav = true}) : super(key: key);
+  const ServiceScreen({Key? key, this.showBottomNav = true, this.onBack})
+    : super(key: key);
 
   @override
   State<ServiceScreen> createState() => _ServiceScreenState();
 }
 
 class _ServiceScreenState extends State<ServiceScreen> {
-  String _selectedFilter = 'All History';
+  int _selectedTabIndex = 0;
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   // Responsive helpers
   double _getResponsivePadding(BuildContext context) {
@@ -55,8 +65,16 @@ class _ServiceScreenState extends State<ServiceScreen> {
 
                 SizedBox(height: isSmall ? 8 : 10),
 
-                // Filter Pills
-                _buildFilterPills(),
+                // Filter Tab Bar
+                CustomTabBar(
+                  tabs: const ['All History', 'Major only', 'Minor only'],
+                  onTabChanged: (index) {
+                    setState(() {
+                      _selectedTabIndex = index;
+                    });
+                  },
+                  initialIndex: _selectedTabIndex,
+                ),
 
                 SizedBox(height: isSmall ? 4 : 6),
 
@@ -65,7 +83,23 @@ class _ServiceScreenState extends State<ServiceScreen> {
                   child:
                       filteredRecords.isEmpty
                           ? _buildEmptyState()
-                          : _buildServiceList(filteredRecords, controller),
+                          : Container(
+                            margin: EdgeInsets.fromLTRB(
+                              _getResponsivePadding(context),
+                              0,
+                              _getResponsivePadding(context),
+                              _getResponsivePadding(context),
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: Colors.grey.shade200),
+                            ),
+                            child: _buildServiceList(
+                              filteredRecords,
+                              controller,
+                            ),
+                          ),
                 ),
               ],
             ),
@@ -97,7 +131,7 @@ class _ServiceScreenState extends State<ServiceScreen> {
       ),
       child: Column(
         children: [
-          // Title
+          // Back button and title
           Padding(
             padding: EdgeInsets.fromLTRB(
               horizontalPadding,
@@ -105,15 +139,36 @@ class _ServiceScreenState extends State<ServiceScreen> {
               horizontalPadding,
               isSmall ? 16 : 20,
             ),
-            child: Center(
-              child: Text(
-                'Services',
-                style: TextStyle(
-                  fontSize: _getResponsiveFontSize(context, 20),
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                GestureDetector(
+                  onTap:
+                      () =>
+                          widget.onBack != null ? widget.onBack!() : Get.back(),
+                  child: Container(
+                    padding: EdgeInsets.all(isSmall ? 6 : 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      color: Colors.white,
+                      size: isSmall ? 18 : 20,
+                    ),
+                  ),
                 ),
-              ),
+                Text(
+                  'Services',
+                  style: TextStyle(
+                    fontSize: _getResponsiveFontSize(context, 20),
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                SizedBox(width: isSmall ? 34 : 38),
+              ],
             ),
           ),
 
@@ -253,92 +308,27 @@ class _ServiceScreenState extends State<ServiceScreen> {
     );
   }
 
-  Widget _buildFilterPills() {
-    final horizontalPadding = _getResponsivePadding(context);
-    final isSmall = _isSmallScreen(context);
-
-    return Padding(
-      padding: EdgeInsets.symmetric(
-        horizontal: horizontalPadding,
-        vertical: isSmall ? 2 : 2,
-      ),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.grey[200]!),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey[200]!,
-              spreadRadius: 1,
-              blurRadius: 2,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(3),
-          child: Row(
-            children: [
-              Expanded(child: _buildFilterPill('All History', isSmall)),
-              SizedBox(width: isSmall ? 3 : 4),
-              Expanded(child: _buildFilterPill('Major only', isSmall)),
-              SizedBox(width: isSmall ? 3 : 4),
-              Expanded(child: _buildFilterPill('Minor only', isSmall)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFilterPill(String label, bool isSmall) {
-    final isSelected = _selectedFilter == label;
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedFilter = label;
-        });
-      },
-      child: Container(
-        padding: EdgeInsets.symmetric(
-          horizontal: isSmall ? 12 : 16,
-          vertical: isSmall ? 7 : 9,
-        ),
-        decoration: BoxDecoration(
-          color: isSelected ? primaryColor.withOpacity(0.1) : Colors.white,
-          borderRadius: BorderRadius.circular(8),
-          border: isSelected ? Border.all(color: primaryColor, width: 1) : null,
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: isSmall ? 13 : 14,
-              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-              color: isSelected ? primaryColor : Colors.grey[700],
-              height: 1.0,
-            ),
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildServiceList(
     List<ServiceRecord> records,
     MileageGetxController controller,
   ) {
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      itemCount: records.length,
-      itemBuilder: (context, index) {
-        final record = records[index];
-        return _buildServiceCard(record, controller);
-      },
+    return Scrollbar(
+      controller: _scrollController,
+      thumbVisibility: true,
+      thickness: 4,
+      radius: const Radius.circular(8),
+      child: ListView.separated(
+        controller: _scrollController,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        itemCount: records.length,
+        separatorBuilder:
+            (context, index) =>
+                Divider(height: 1, thickness: 1, color: Colors.grey[300]!),
+        itemBuilder: (context, index) {
+          final record = records[index];
+          return _buildServiceCard(record, controller);
+        },
+      ),
     );
   }
 
@@ -348,38 +338,24 @@ class _ServiceScreenState extends State<ServiceScreen> {
   ) {
     final isMajor = record.serviceType == 'Major';
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 0,
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Icon
           Container(
-            width: 50,
-            height: 50,
+            margin: const EdgeInsets.only(right: 10, top: 4),
+            width: 42,
+            height: 42,
             decoration: BoxDecoration(
-              color:
-                  isMajor ? const Color(0xFFFFEBEE) : const Color(0xFFFFF3E0),
-              borderRadius: BorderRadius.circular(12),
+              shape: BoxShape.circle,
+              color: const Color(0xFFF0F4FF),
             ),
-            child: Icon(
-              Icons.build_rounded,
-              color: isMajor ? Colors.red : Colors.orange,
-              size: 26,
+            child: Center(
+              child: Icon(Icons.build_rounded, color: primaryColor, size: 22),
             ),
           ),
-          const SizedBox(width: 16),
 
           // Service Info
           Expanded(
@@ -494,9 +470,9 @@ class _ServiceScreenState extends State<ServiceScreen> {
   List<ServiceRecord> _getFilteredRecords(MileageGetxController controller) {
     final records = controller.filteredServiceRecords;
 
-    if (_selectedFilter == 'Major only') {
+    if (_selectedTabIndex == 1) {
       return records.where((r) => r.serviceType == 'Major').toList();
-    } else if (_selectedFilter == 'Minor only') {
+    } else if (_selectedTabIndex == 2) {
       return records.where((r) => r.serviceType == 'Minor').toList();
     }
     return records;
@@ -1177,9 +1153,20 @@ class _EditServiceDialogState extends State<_EditServiceDialog>
         // Delete old record
         widget.controller.deleteServiceRecord(widget.existingRecord.id);
 
+        final parsed = DateTime.parse(dateController.text);
+        final now = DateTime.now();
+        final entryDate = DateTime(
+          parsed.year,
+          parsed.month,
+          parsed.day,
+          now.hour,
+          now.minute,
+          now.second,
+          now.millisecond,
+        );
         // Add updated record
         widget.controller.addServiceEntry(
-          DateTime.parse(dateController.text),
+          entryDate,
           double.parse(odometerController.text),
           double.parse(totalCostController.text),
           _selectedServiceType,

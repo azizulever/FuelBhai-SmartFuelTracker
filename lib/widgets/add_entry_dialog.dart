@@ -404,8 +404,19 @@ class _AddEntryDialogState extends State<AddEntryDialog>
   void _submitForm() {
     if (_formKey.currentState!.validate()) {
       try {
+        final parsed = DateTime.parse(dateController.text);
+        final now = DateTime.now();
+        final entryDate = DateTime(
+          parsed.year,
+          parsed.month,
+          parsed.day,
+          now.hour,
+          now.minute,
+          now.second,
+          now.millisecond,
+        );
         widget.controller.addFuelEntry(
-          DateTime.parse(dateController.text),
+          entryDate,
           double.parse(odometerController.text),
           double.parse(fuelAmountController.text),
           widget.controller.selectedVehicleType,
