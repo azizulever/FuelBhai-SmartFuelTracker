@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:mileage_calculator/controllers/mileage_controller.dart';
@@ -55,53 +56,60 @@ class _ServiceScreenState extends State<ServiceScreen> {
       builder: (controller) {
         final filteredRecords = _getFilteredRecords(controller);
 
-        return Scaffold(
-          backgroundColor: const Color(0xFFF5F5F5),
-          body: SafeArea(
-            child: Column(
-              children: [
-                // Top Header
-                _buildHeader(context, controller),
+        return AnnotatedRegion<SystemUiOverlayStyle>(
+          value: const SystemUiOverlayStyle(
+            statusBarColor: Colors.transparent,
+            statusBarIconBrightness: Brightness.light,
+          ),
+          child: Scaffold(
+            backgroundColor: const Color(0xFFF5F5F5),
+            body: SafeArea(
+              top: false,
+              child: Column(
+                children: [
+                  // Top Header
+                  _buildHeader(context, controller),
 
-                SizedBox(height: isSmall ? 8 : 10),
+                  SizedBox(height: isSmall ? 8 : 10),
 
-                // Filter Tab Bar
-                CustomTabBar(
-                  tabs: const ['All History', 'Major only', 'Minor only'],
-                  onTabChanged: (index) {
-                    setState(() {
-                      _selectedTabIndex = index;
-                    });
-                  },
-                  initialIndex: _selectedTabIndex,
-                ),
+                  // Filter Tab Bar
+                  CustomTabBar(
+                    tabs: const ['All History', 'Major only', 'Minor only'],
+                    onTabChanged: (index) {
+                      setState(() {
+                        _selectedTabIndex = index;
+                      });
+                    },
+                    initialIndex: _selectedTabIndex,
+                  ),
 
-                SizedBox(height: isSmall ? 4 : 6),
+                  SizedBox(height: isSmall ? 4 : 6),
 
-                // Service List
-                Expanded(
-                  child:
-                      filteredRecords.isEmpty
-                          ? _buildEmptyState()
-                          : Container(
-                            margin: EdgeInsets.fromLTRB(
-                              _getResponsivePadding(context),
-                              0,
-                              _getResponsivePadding(context),
-                              _getResponsivePadding(context),
+                  // Service List
+                  Expanded(
+                    child:
+                        filteredRecords.isEmpty
+                            ? _buildEmptyState()
+                            : Container(
+                              margin: EdgeInsets.fromLTRB(
+                                _getResponsivePadding(context),
+                                0,
+                                _getResponsivePadding(context),
+                                _getResponsivePadding(context),
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: Colors.grey.shade200),
+                              ),
+                              child: _buildServiceList(
+                                filteredRecords,
+                                controller,
+                              ),
                             ),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: Colors.grey.shade200),
-                            ),
-                            child: _buildServiceList(
-                              filteredRecords,
-                              controller,
-                            ),
-                          ),
-                ),
-              ],
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -135,7 +143,7 @@ class _ServiceScreenState extends State<ServiceScreen> {
           Padding(
             padding: EdgeInsets.fromLTRB(
               horizontalPadding,
-              isSmall ? 10 : 12,
+              MediaQuery.of(context).padding.top + (isSmall ? 10 : 12),
               horizontalPadding,
               isSmall ? 16 : 20,
             ),

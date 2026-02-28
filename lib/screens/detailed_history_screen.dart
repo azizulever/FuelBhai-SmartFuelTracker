@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:mileage_calculator/controllers/mileage_controller.dart';
 import 'package:mileage_calculator/utils/theme.dart';
@@ -52,227 +53,235 @@ class _DetailedHistoryScreenState extends State<DetailedHistoryScreen> {
     return GetBuilder<MileageGetxController>(
       init: MileageGetxController(),
       builder: (controller) {
-        return Scaffold(
-          backgroundColor: const Color(0xFFF5F5F5),
-          body: SafeArea(
-            child: Column(
-              children: [
-                // Unified Header Section
-                Container(
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: primaryColor,
-                    borderRadius: const BorderRadius.only(
-                      bottomLeft: Radius.circular(30),
-                      bottomRight: Radius.circular(30),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: primaryColor.withOpacity(0.3),
-                        spreadRadius: 1,
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
+        return AnnotatedRegion<SystemUiOverlayStyle>(
+          value: const SystemUiOverlayStyle(
+            statusBarColor: Colors.transparent,
+            statusBarIconBrightness: Brightness.light,
+          ),
+          child: Scaffold(
+            backgroundColor: const Color(0xFFF5F5F5),
+            body: SafeArea(
+              top: false,
+              child: Column(
+                children: [
+                  // Unified Header Section
+                  Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: primaryColor,
+                      borderRadius: const BorderRadius.only(
+                        bottomLeft: Radius.circular(30),
+                        bottomRight: Radius.circular(30),
                       ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      // Back button and title
-                      Padding(
-                        padding: EdgeInsets.fromLTRB(
-                          horizontalPadding,
-                          isSmall ? 10 : 12,
-                          horizontalPadding,
-                          isSmall ? 16 : 20,
+                      boxShadow: [
+                        BoxShadow(
+                          color: primaryColor.withOpacity(0.3),
+                          spreadRadius: 1,
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
                         ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            GestureDetector(
-                              onTap:
-                                  () =>
-                                      widget.onBack != null
-                                          ? widget.onBack!()
-                                          : Get.back(),
-                              child: Container(
-                                padding: EdgeInsets.all(isSmall ? 6 : 8),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(12),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        // Back button and title
+                        Padding(
+                          padding: EdgeInsets.fromLTRB(
+                            horizontalPadding,
+                            MediaQuery.of(context).padding.top +
+                                (isSmall ? 10 : 12),
+                            horizontalPadding,
+                            isSmall ? 16 : 20,
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              GestureDetector(
+                                onTap:
+                                    () =>
+                                        widget.onBack != null
+                                            ? widget.onBack!()
+                                            : Get.back(),
+                                child: Container(
+                                  padding: EdgeInsets.all(isSmall ? 6 : 8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Icon(
+                                    Icons.arrow_back_ios_new_rounded,
+                                    color: Colors.white,
+                                    size: isSmall ? 18 : 20,
+                                  ),
                                 ),
-                                child: Icon(
-                                  Icons.arrow_back_ios_new_rounded,
+                              ),
+                              Text(
+                                '${controller.selectedVehicleType} Fueling',
+                                style: TextStyle(
+                                  fontSize: _getResponsiveFontSize(context, 20),
+                                  fontWeight: FontWeight.bold,
                                   color: Colors.white,
-                                  size: isSmall ? 18 : 20,
                                 ),
                               ),
+                              SizedBox(width: isSmall ? 34 : 38),
+                            ],
+                          ),
+                        ),
+
+                        // Fuel Icon
+                        Container(
+                          padding: EdgeInsets.all(isSmall ? 16 : 20),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.local_gas_station_rounded,
+                            color: Colors.white,
+                            size: isSmall ? 40 : 48,
+                          ),
+                        ),
+
+                        SizedBox(height: isSmall ? 20 : 24),
+
+                        // Horizontal divider lines
+                        Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Container(
+                                    height: 2,
+                                    margin: EdgeInsets.only(
+                                      left: isSmall ? 30 : 40,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          Colors.white.withOpacity(0),
+                                          Colors.white.withOpacity(0.5),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Container(
+                                    height: 2,
+                                    margin: EdgeInsets.only(
+                                      right: isSmall ? 30 : 40,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          Colors.white.withOpacity(0.5),
+                                          Colors.white.withOpacity(0),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                            Text(
-                              '${controller.selectedVehicleType} Fueling',
-                              style: TextStyle(
-                                fontSize: _getResponsiveFontSize(context, 20),
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                            SizedBox(width: isSmall ? 34 : 38),
                           ],
                         ),
-                      ),
 
-                      // Fuel Icon
-                      Container(
-                        padding: EdgeInsets.all(isSmall ? 16 : 20),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.local_gas_station_rounded,
-                          color: Colors.white,
-                          size: isSmall ? 40 : 48,
-                        ),
-                      ),
+                        SizedBox(height: isSmall ? 20 : 24),
 
-                      SizedBox(height: isSmall ? 20 : 24),
-
-                      // Horizontal divider lines
-                      Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          Row(
+                        // Statistics section
+                        Padding(
+                          padding: EdgeInsets.fromLTRB(
+                            horizontalPadding,
+                            0,
+                            horizontalPadding,
+                            isSmall ? 20 : 24,
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                             children: [
                               Expanded(
-                                child: Container(
-                                  height: 2,
-                                  margin: EdgeInsets.only(
-                                    left: isSmall ? 30 : 40,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: [
-                                        Colors.white.withOpacity(0),
-                                        Colors.white.withOpacity(0.5),
-                                      ],
-                                    ),
-                                  ),
+                                child: _buildStatItem(
+                                  context: context,
+                                  title: 'Total\nFuel',
+                                  value:
+                                      '${controller.getTotalFuel().toStringAsFixed(2)}L',
                                 ),
                               ),
+                              Container(
+                                width: 1,
+                                height: isSmall ? 30 : 35,
+                                color: Colors.white30,
+                              ),
                               Expanded(
-                                child: Container(
-                                  height: 2,
-                                  margin: EdgeInsets.only(
-                                    right: isSmall ? 30 : 40,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: [
-                                        Colors.white.withOpacity(0.5),
-                                        Colors.white.withOpacity(0),
-                                      ],
-                                    ),
-                                  ),
+                                child: _buildStatItem(
+                                  context: context,
+                                  title: 'Total\nCost',
+                                  value:
+                                      '${controller.getTotalCost().toStringAsFixed(0)}৳',
+                                ),
+                              ),
+                              Container(
+                                width: 1,
+                                height: isSmall ? 30 : 35,
+                                color: Colors.white30,
+                              ),
+                              Expanded(
+                                child: _buildStatItem(
+                                  context: context,
+                                  title: 'Total\nDistance',
+                                  value:
+                                      '${controller.getTotalDistance().toStringAsFixed(0)}KM',
                                 ),
                               ),
                             ],
                           ),
-                        ],
-                      ),
-
-                      SizedBox(height: isSmall ? 20 : 24),
-
-                      // Statistics section
-                      Padding(
-                        padding: EdgeInsets.fromLTRB(
-                          horizontalPadding,
-                          0,
-                          horizontalPadding,
-                          isSmall ? 20 : 24,
                         ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: [
-                            Expanded(
-                              child: _buildStatItem(
-                                context: context,
-                                title: 'Total\nFuel',
-                                value:
-                                    '${controller.getTotalFuel().toStringAsFixed(2)}L',
-                              ),
-                            ),
-                            Container(
-                              width: 1,
-                              height: isSmall ? 30 : 35,
-                              color: Colors.white30,
-                            ),
-                            Expanded(
-                              child: _buildStatItem(
-                                context: context,
-                                title: 'Total\nCost',
-                                value:
-                                    '${controller.getTotalCost().toStringAsFixed(0)}৳',
-                              ),
-                            ),
-                            Container(
-                              width: 1,
-                              height: isSmall ? 30 : 35,
-                              color: Colors.white30,
-                            ),
-                            Expanded(
-                              child: _buildStatItem(
-                                context: context,
-                                title: 'Total\nDistance',
-                                value:
-                                    '${controller.getTotalDistance().toStringAsFixed(0)}KM',
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
 
-                SizedBox(height: isSmall ? 8 : 10),
-                CustomTabBar(
-                  tabs: const ['All History', 'Best Cost', 'Best Mileage'],
-                  onTabChanged: (index) {
-                    setState(() {
-                      _selectedTabIndex = index;
-                    });
-                  },
-                  initialIndex: _selectedTabIndex,
-                ),
-                SizedBox(height: isSmall ? 4 : 6),
-                // Tab content
-                Expanded(
-                  child:
-                      controller.filteredEntries.isEmpty
-                          ? EmptyHistoryPlaceholder(
-                            vehicleType: controller.selectedVehicleType,
-                          )
-                          : Container(
-                            margin: EdgeInsets.fromLTRB(
-                              horizontalPadding,
-                              0,
-                              horizontalPadding,
-                              horizontalPadding,
+                  SizedBox(height: isSmall ? 8 : 10),
+                  CustomTabBar(
+                    tabs: const ['All History', 'Best Cost', 'Best Mileage'],
+                    onTabChanged: (index) {
+                      setState(() {
+                        _selectedTabIndex = index;
+                      });
+                    },
+                    initialIndex: _selectedTabIndex,
+                  ),
+                  SizedBox(height: isSmall ? 4 : 6),
+                  // Tab content
+                  Expanded(
+                    child:
+                        controller.filteredEntries.isEmpty
+                            ? EmptyHistoryPlaceholder(
+                              vehicleType: controller.selectedVehicleType,
+                            )
+                            : Container(
+                              margin: EdgeInsets.fromLTRB(
+                                horizontalPadding,
+                                0,
+                                horizontalPadding,
+                                horizontalPadding,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: Colors.grey.shade200),
+                              ),
+                              child: _buildTabContent(controller),
                             ),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: Colors.grey.shade200),
-                            ),
-                            child: _buildTabContent(controller),
-                          ),
-                ),
-              ],
+                  ),
+                ],
+              ),
             ),
+            bottomNavigationBar:
+                widget.showBottomNav
+                    ? _buildBottomNavigation(context, controller)
+                    : null,
           ),
-          bottomNavigationBar:
-              widget.showBottomNav
-                  ? _buildBottomNavigation(context, controller)
-                  : null,
         );
       },
     );

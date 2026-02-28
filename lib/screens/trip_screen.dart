@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:mileage_calculator/controllers/mileage_controller.dart';
@@ -56,55 +57,62 @@ class _TripScreenState extends State<TripScreen> {
         final activeTrip = controller.activeTrip;
         final completedTrips = controller.completedTrips;
 
-        return Scaffold(
-          backgroundColor: const Color(0xFFF5F5F5),
-          body: SafeArea(
-            child: Column(
-              children: [
-                // Styled Header
-                _buildHeader(context),
+        return AnnotatedRegion<SystemUiOverlayStyle>(
+          value: const SystemUiOverlayStyle(
+            statusBarColor: Colors.transparent,
+            statusBarIconBrightness: Brightness.light,
+          ),
+          child: Scaffold(
+            backgroundColor: const Color(0xFFF5F5F5),
+            body: SafeArea(
+              top: false,
+              child: Column(
+                children: [
+                  // Styled Header
+                  _buildHeader(context),
 
-                SizedBox(height: isSmall ? 12 : 16),
+                  SizedBox(height: isSmall ? 12 : 16),
 
-                // Top Status Card
-                _buildTopStatusCard(
-                  context,
-                  controller,
-                  isActive,
-                  activeTrip,
-                  isSmall,
-                  horizontalPadding,
-                ),
+                  // Top Status Card
+                  _buildTopStatusCard(
+                    context,
+                    controller,
+                    isActive,
+                    activeTrip,
+                    isSmall,
+                    horizontalPadding,
+                  ),
 
-                SizedBox(height: isSmall ? 12 : 16),
+                  SizedBox(height: isSmall ? 12 : 16),
 
-                // Cost Entries or Trip History
-                Expanded(
-                  child:
-                      isActive
-                          ? _buildCostEntriesList(
-                            context,
-                            controller,
-                            activeTrip!,
-                          )
-                          : completedTrips.isEmpty
-                          ? _buildTripHistory(completedTrips)
-                          : Container(
-                            margin: EdgeInsets.fromLTRB(
-                              horizontalPadding,
-                              0,
-                              horizontalPadding,
-                              horizontalPadding,
+                  // Cost Entries or Trip History
+                  Expanded(
+                    child:
+                        isActive
+                            ? _buildCostEntriesList(
+                              context,
+                              controller,
+                              activeTrip!,
+                            )
+                            : completedTrips.isEmpty
+                            ? _buildTripHistory(completedTrips)
+                            : Container(
+                              margin: EdgeInsets.fromLTRB(
+                                horizontalPadding,
+                                0,
+                                horizontalPadding,
+                                horizontalPadding,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: Colors.grey.shade200),
+                              ),
+                              child: _buildTripHistory(completedTrips),
                             ),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: Colors.grey.shade200),
-                            ),
-                            child: _buildTripHistory(completedTrips),
-                          ),
-                ),
-              ],
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -135,7 +143,7 @@ class _TripScreenState extends State<TripScreen> {
       child: Padding(
         padding: EdgeInsets.fromLTRB(
           horizontalPadding,
-          isSmall ? 10 : 12,
+          MediaQuery.of(context).padding.top + (isSmall ? 10 : 12),
           horizontalPadding,
           isSmall ? 16 : 20,
         ),
