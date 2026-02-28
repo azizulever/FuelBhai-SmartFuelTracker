@@ -8,6 +8,7 @@ import 'package:mileage_calculator/widgets/empty_history_placeholder.dart';
 import 'package:mileage_calculator/widgets/fuel_entry_list.dart';
 import 'package:mileage_calculator/widgets/add_entry_dialog.dart';
 import 'package:mileage_calculator/widgets/main_navigation.dart';
+import 'package:mileage_calculator/services/analytics_service.dart';
 
 class DetailedHistoryScreen extends StatefulWidget {
   final bool showBottomNav;
@@ -25,6 +26,12 @@ class DetailedHistoryScreen extends StatefulWidget {
 
 class _DetailedHistoryScreenState extends State<DetailedHistoryScreen> {
   int _selectedTabIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    AnalyticsService.to.logScreenView('DetailedHistoryScreen');
+  }
 
   // Responsive helpers
   double _getResponsivePadding(BuildContext context) {

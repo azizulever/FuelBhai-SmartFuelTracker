@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mileage_calculator/services/analytics_service.dart';
 import 'package:mileage_calculator/utils/theme.dart';
 
 class TermsConditionsScreen extends StatelessWidget {
@@ -6,6 +7,7 @@ class TermsConditionsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AnalyticsService.to.logScreenView('TermsConditionsScreen');
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
@@ -150,11 +152,7 @@ class TermsConditionsScreen extends StatelessWidget {
   Widget _buildSection(String content) {
     return Text(
       content,
-      style: TextStyle(
-        fontSize: 14,
-        color: Colors.grey[700],
-        height: 1.5,
-      ),
+      style: TextStyle(fontSize: 14, color: Colors.grey[700], height: 1.5),
     );
   }
 }

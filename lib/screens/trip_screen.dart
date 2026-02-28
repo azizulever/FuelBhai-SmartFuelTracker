@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:mileage_calculator/controllers/mileage_controller.dart';
 import 'package:mileage_calculator/models/trip_record.dart';
 import 'package:mileage_calculator/utils/theme.dart';
+import 'package:mileage_calculator/services/analytics_service.dart';
 
 class TripScreen extends StatefulWidget {
   final bool showBottomNav;
@@ -19,6 +20,12 @@ class TripScreen extends StatefulWidget {
 
 class _TripScreenState extends State<TripScreen> {
   final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    AnalyticsService.to.logScreenView('TripScreen');
+  }
 
   @override
   void dispose() {
@@ -78,7 +85,14 @@ class _TripScreenState extends State<TripScreen> {
                     context,
                     controller,
                     isActive,
-                    activeTrip,
+                    // When active show the live trip; otherwise show the last
+                    // completed trip so the card displays its duration/cost and
+                    // the button reads “New Trip” instead of “Start Trip”.
+                    isActive
+                        ? activeTrip
+                        : (completedTrips.isNotEmpty
+                            ? completedTrips.first
+                            : null),
                     isSmall,
                     horizontalPadding,
                   ),
@@ -359,7 +373,7 @@ class _TripScreenState extends State<TripScreen> {
   }
 
   String _formatDuration(TripRecord? trip) {
-    if (trip == null) return '00:00:43';
+    if (trip == null) return '00:00:00';
     final duration = trip.duration;
     final hours = duration.inHours;
     final minutes = duration.inMinutes.remainder(60);

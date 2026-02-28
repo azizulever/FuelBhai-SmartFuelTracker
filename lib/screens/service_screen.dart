@@ -6,6 +6,7 @@ import 'package:mileage_calculator/controllers/mileage_controller.dart';
 import 'package:mileage_calculator/models/service_record.dart';
 import 'package:mileage_calculator/utils/theme.dart';
 import 'package:mileage_calculator/widgets/custom_tab_bar.dart';
+import 'package:mileage_calculator/services/analytics_service.dart';
 
 class ServiceScreen extends StatefulWidget {
   final bool showBottomNav;
@@ -21,6 +22,12 @@ class ServiceScreen extends StatefulWidget {
 class _ServiceScreenState extends State<ServiceScreen> {
   int _selectedTabIndex = 0;
   final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    AnalyticsService.to.logScreenView('ServiceScreen');
+  }
 
   @override
   void dispose() {

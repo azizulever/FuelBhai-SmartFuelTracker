@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:get/get.dart';
 import 'package:mileage_calculator/utils/theme.dart';
+import 'package:mileage_calculator/services/analytics_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class EditNameScreen extends StatefulWidget {
@@ -21,6 +22,7 @@ class _EditNameScreenState extends State<EditNameScreen> {
   @override
   void initState() {
     super.initState();
+    AnalyticsService.to.logScreenView('EditNameScreen');
     _nameController = TextEditingController(text: widget.currentName);
   }
 
@@ -100,7 +102,10 @@ class _EditNameScreenState extends State<EditNameScreen> {
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: primaryColor, width: 2),
+                          borderSide: const BorderSide(
+                            color: primaryColor,
+                            width: 2,
+                          ),
                         ),
                         errorBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -120,9 +125,9 @@ class _EditNameScreenState extends State<EditNameScreen> {
                   ],
                 ),
               ),
-              
+
               const SizedBox(height: 32),
-              
+
               // Save Button
               SizedBox(
                 width: double.infinity,
@@ -136,23 +141,24 @@ class _EditNameScreenState extends State<EditNameScreen> {
                     ),
                     elevation: 0,
                   ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
+                  child:
+                      _isLoading
+                          ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                          : const Text(
+                            'Save Changes',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
                           ),
-                        )
-                      : const Text(
-                          'Save Changes',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
                 ),
               ),
             ],

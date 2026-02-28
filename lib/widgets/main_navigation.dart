@@ -7,6 +7,7 @@ import 'package:mileage_calculator/screens/home_screen.dart';
 import 'package:mileage_calculator/screens/notification_screen.dart';
 import 'package:mileage_calculator/screens/service_screen.dart';
 import 'package:mileage_calculator/screens/trip_screen.dart';
+import 'package:mileage_calculator/services/analytics_service.dart';
 import 'package:mileage_calculator/utils/theme.dart';
 import 'package:mileage_calculator/widgets/entry_type_selection_dialog.dart';
 
@@ -37,6 +38,14 @@ class _MainNavigationState extends State<MainNavigation> {
       print("MainNavigation created new MileageController");
     }
     print("MainNavigation initialized with index: $_currentIndex");
+    // Log initial screen view
+    _logCurrentTab();
+  }
+
+  static const _tabNames = ['Home', 'Fueling', 'Service', 'Trip', 'Profile'];
+
+  void _logCurrentTab() {
+    AnalyticsService.to.logTabChange(_tabNames[_currentIndex]);
   }
 
   void _onNavItemTapped(int index) {
@@ -44,6 +53,7 @@ class _MainNavigationState extends State<MainNavigation> {
     setState(() {
       _currentIndex = index;
     });
+    _logCurrentTab();
   }
 
   // Responsive helpers

@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:mileage_calculator/models/fuel_station.dart';
 import 'package:mileage_calculator/services/nearby_stations_service.dart';
 import 'package:mileage_calculator/utils/theme.dart';
+import 'package:mileage_calculator/services/analytics_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class NearbyStationsScreen extends StatefulWidget {
@@ -30,6 +31,7 @@ class _NearbyStationsScreenState extends State<NearbyStationsScreen> {
   @override
   void initState() {
     super.initState();
+    AnalyticsService.to.logScreenView('NearbyStationsScreen');
     // Clear cache to ensure fresh data when screen opens
     _stationsService.clearCache();
     _loadStations();

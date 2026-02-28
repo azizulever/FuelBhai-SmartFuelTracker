@@ -15,6 +15,10 @@ class ServiceTripSyncService extends GetxController {
   RxList<ServiceRecord> serviceRecords = <ServiceRecord>[].obs;
   RxList<TripRecord> tripRecords = <TripRecord>[].obs;
   RxBool isLoading = false.obs;
+  // True while fetchTripRecords() is in progress — guards controller's
+  // _updateTripRecordsFromSync from treating the transient empty list as
+  // "no active trip" and killing an in-progress trip.
+  bool isSyncing = false;
 
   @override
   void onInit() {
@@ -309,10 +313,12 @@ class ServiceTripSyncService extends GetxController {
   Future<void> fetchTripRecords() async {
     try {
       isLoading.value = true;
+      isSyncing = true; // guard: block _updateTripRecordsFromSync during fetch
       String userId = _authService.user.value?.uid ?? '';
 
       if (userId.isEmpty) {
         print('❌ User not logged in');
+        isSyncing = false;
         return;
       }
 
@@ -339,22 +345,29 @@ class ServiceTripSyncService extends GetxController {
                 .get();
       }
 
-      tripRecords.clear();
+      // Build list locally first, then assign in one shot so reactive
+      // listeners never see an intermediate empty 'tripRecords' state.
+      final fetched = <TripRecord>[];
       for (var doc in snapshot.docs) {
         final data = doc.data() as Map<String, dynamic>;
-        final record = TripRecord.fromMap(data, doc.id);
-        tripRecords.add(record);
+        fetched.add(TripRecord.fromMap(data, doc.id));
       }
+      fetched.sort((a, b) => b.startTime.compareTo(a.startTime));
 
-      // Sort locally by startTime (descending)
-      tripRecords.sort((a, b) => b.startTime.compareTo(a.startTime));
+      // Clear isSyncing BEFORE the assignment so the controller's ever
+      // listener fully processes the complete, authoritative data.
+      isSyncing = false;
+      // Single atomic assignment — listeners see the full updated list, never empty.
+      tripRecords.value = fetched;
 
       await _saveTripRecordsLocally();
       print('✅ Fetched ${tripRecords.length} trip records');
     } catch (e) {
       print('❌ Error fetching trip records: $e');
+      isSyncing = false;
       await _loadTripRecordsLocally();
     } finally {
+      isSyncing = false;
       isLoading.value = false;
     }
   }
@@ -391,8 +404,10 @@ class ServiceTripSyncService extends GetxController {
         throw Exception('User not logged in');
       }
 
-      // Add to local list immediately
-      final tempId = DateTime.now().millisecondsSinceEpoch.toString();
+      // Add to local list immediately, using the SAME id the controller
+      // assigned — this keeps the controller's _activeTrip.id and the
+      // sync service's tripRecord id in sync throughout the Firebase round-trip.
+      final tempId = record.id;
       final localRecord = TripRecord(
         id: tempId,
         userId: record.userId,
@@ -414,20 +429,41 @@ class ServiceTripSyncService extends GetxController {
             .collection('trip_records')
             .add(record.toMap());
 
-        // Update with Firebase ID
+        // Update with Firebase ID — use the CURRENT local state, not the
+        // original `record`. If stopTrip() was called while we were waiting
+        // for Firebase to respond, the local entry already has isActive:false,
+        // endTime, updated costEntries, etc. — we must preserve all of that.
         final index = tripRecords.indexWhere((r) => r.id == tempId);
         if (index != -1) {
-          tripRecords[index] = TripRecord(
+          final currentRecord = tripRecords[index]; // snapshot of current state
+          final firebaseRecord = TripRecord(
             id: docRef.id,
-            userId: record.userId,
-            startTime: record.startTime,
-            endTime: record.endTime,
-            duration: record.duration,
-            costEntries: record.costEntries,
-            vehicleType: record.vehicleType,
-            isActive: record.isActive,
+            userId: currentRecord.userId,
+            startTime: currentRecord.startTime,
+            endTime: currentRecord.endTime,
+            duration: currentRecord.duration,
+            costEntries: currentRecord.costEntries,
+            vehicleType: currentRecord.vehicleType,
+            isActive:
+                currentRecord
+                    .isActive, // preserve current state, not stale original
           );
+          tripRecords[index] = firebaseRecord;
           await _saveTripRecordsLocally();
+
+          // If the trip was stopped while we were awaiting Firebase, push
+          // the stopped state to Firestore now so the document is consistent.
+          if (!currentRecord.isActive) {
+            try {
+              await _firestore
+                  .collection('trip_records')
+                  .doc(docRef.id)
+                  .update(firebaseRecord.toMap());
+              print('✅ Applied pending stop to Firebase trip: ${docRef.id}');
+            } catch (e) {
+              print('⚠️ Failed to apply pending stop to Firebase: $e');
+            }
+          }
         }
         print('✅ Trip record saved to Firebase: ${docRef.id}');
       } catch (e) {
@@ -576,16 +612,11 @@ class ServiceTripSyncService extends GetxController {
     print('🔄 Syncing Service and Trip records from Firebase...');
 
     try {
-      // Clear existing data before fresh sync
-      serviceRecords.clear();
-      tripRecords.clear();
-
-      // Fetch both service and trip records in parallel
+      // Fetch both service and trip records in parallel.
+      // Each fetch function handles its own clear+assign atomically,
+      // so we don't clear here (which would fire reactive listeners and
+      // kill any in-progress trip).
       await Future.wait([fetchServiceRecords(), fetchTripRecords()]);
-
-      // Force notify reactive listeners
-      serviceRecords.refresh();
-      tripRecords.refresh();
 
       print('✅ Service and Trip sync completed');
       print(

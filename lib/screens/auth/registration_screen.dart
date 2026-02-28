@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:mileage_calculator/screens/auth/login_screen.dart';
 import 'package:mileage_calculator/screens/auth/signup_email_verification_screen.dart';
 import 'package:mileage_calculator/services/auth_service.dart';
+import 'package:mileage_calculator/services/analytics_service.dart';
 import 'package:mileage_calculator/widgets/main_navigation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -41,6 +42,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   @override
   void initState() {
     super.initState();
+    AnalyticsService.to.logScreenView('RegistrationScreen');
     try {
       _authService = Get.find<AuthService>();
     } catch (e) {

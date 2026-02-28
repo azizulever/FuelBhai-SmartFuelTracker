@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:mileage_calculator/services/analytics_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -15,6 +17,7 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   void initState() {
     super.initState();
+    AnalyticsService.to.logScreenView('SplashScreen');
     _controller = AnimationController(
       duration: const Duration(seconds: 2),
       vsync: this,
@@ -47,8 +50,8 @@ class _SplashScreenState extends State<SplashScreen>
             children: [
               SizedBox(height: screenHeight * 0.35),
               Center(
-                child: Image.asset(
-                  'assets/icons/app_logo.png',
+                child: SvgPicture.asset(
+                  'assets/app_logo.svg',
                   width: screenWidth * 0.28,
                   height: screenWidth * 0.28,
                 ),

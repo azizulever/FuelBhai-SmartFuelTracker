@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:mileage_calculator/services/auth_service.dart';
+import 'package:mileage_calculator/services/analytics_service.dart';
 import 'package:mileage_calculator/utils/theme.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
@@ -14,6 +15,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final AuthService _authService = Get.find<AuthService>();
+
+  @override
+  void initState() {
+    super.initState();
+    AnalyticsService.to.logScreenView('ForgotPasswordScreen');
+  }
 
   @override
   void dispose() {

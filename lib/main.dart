@@ -12,10 +12,14 @@ import 'package:mileage_calculator/widgets/main_navigation.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:mileage_calculator/firebase_options.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:mileage_calculator/services/analytics_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // Initialize Analytics service
+  Get.put(AnalyticsService());
 
   // Initialize AuthService first and check guest mode
   final authService = Get.put(AuthService());
@@ -35,10 +39,12 @@ class MileageCalculatorApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final analyticsService = Get.find<AnalyticsService>();
     return GetMaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'FuelBhai',
       theme: appTheme,
+      navigatorObservers: [analyticsService.observer],
       home: const AuthWrapper(),
     );
   }

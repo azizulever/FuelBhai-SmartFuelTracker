@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 import 'package:mileage_calculator/screens/auth/login_screen.dart';
+import 'package:mileage_calculator/services/analytics_service.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
   final String email;
@@ -21,6 +22,12 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    AnalyticsService.to.logScreenView('ResetPasswordScreen');
+  }
 
   @override
   void dispose() {

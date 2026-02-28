@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:mileage_calculator/utils/theme.dart';
+import 'package:mileage_calculator/services/analytics_service.dart';
 
 class NotificationScreen extends StatefulWidget {
   final bool showBottomNav;
@@ -14,6 +15,12 @@ class NotificationScreen extends StatefulWidget {
 
 class _NotificationScreenState extends State<NotificationScreen> {
   final List<NotificationItem> notifications = []; // Empty list for now
+
+  @override
+  void initState() {
+    super.initState();
+    AnalyticsService.to.logScreenView('NotificationScreen');
+  }
 
   @override
   Widget build(BuildContext context) {

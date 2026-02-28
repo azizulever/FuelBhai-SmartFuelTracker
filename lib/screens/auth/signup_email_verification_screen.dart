@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:mileage_calculator/screens/auth/login_screen.dart';
 import 'package:mileage_calculator/services/auth_service.dart';
+import 'package:mileage_calculator/services/analytics_service.dart';
 
 class SignupEmailVerificationScreen extends StatefulWidget {
   final String email;
@@ -29,6 +30,7 @@ class _SignupEmailVerificationScreenState
   @override
   void initState() {
     super.initState();
+    AnalyticsService.to.logScreenView('SignupEmailVerificationScreen');
     try {
       _authService = Get.find<AuthService>();
     } catch (e) {

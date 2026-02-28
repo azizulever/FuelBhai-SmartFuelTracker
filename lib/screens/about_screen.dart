@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:mileage_calculator/services/analytics_service.dart';
 import 'package:mileage_calculator/utils/theme.dart';
 
 class AboutScreen extends StatelessWidget {
@@ -7,6 +8,7 @@ class AboutScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AnalyticsService.to.logScreenView('AboutScreen');
     return Scaffold(
       appBar: AppBar(
         title: const Text(

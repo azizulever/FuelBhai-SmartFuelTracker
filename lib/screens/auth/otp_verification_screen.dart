@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 import 'package:mileage_calculator/screens/auth/reset_password_screen.dart';
+import 'package:mileage_calculator/services/analytics_service.dart';
 
 class OTPVerificationScreen extends StatefulWidget {
   final String email;
@@ -21,6 +22,12 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
   );
   final List<FocusNode> _focusNodes = List.generate(6, (index) => FocusNode());
   bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    AnalyticsService.to.logScreenView('OTPVerificationScreen');
+  }
 
   @override
   void dispose() {

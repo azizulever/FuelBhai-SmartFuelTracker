@@ -5,6 +5,7 @@ import 'package:mileage_calculator/controllers/mileage_controller.dart';
 import 'package:mileage_calculator/screens/auth/email_verification_screen.dart';
 import 'package:mileage_calculator/screens/auth/registration_screen.dart';
 import 'package:mileage_calculator/services/auth_service.dart';
+import 'package:mileage_calculator/services/analytics_service.dart';
 import 'package:mileage_calculator/widgets/main_navigation.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -25,6 +26,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
+    AnalyticsService.to.logScreenView('LoginScreen');
     try {
       _authService = Get.find<AuthService>();
     } catch (e) {

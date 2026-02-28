@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:mileage_calculator/services/analytics_service.dart';
 import 'package:mileage_calculator/utils/theme.dart';
 
 class ContactSupportScreen extends StatelessWidget {
@@ -7,6 +8,7 @@ class ContactSupportScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AnalyticsService.to.logScreenView('ContactSupportScreen');
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
@@ -50,11 +52,7 @@ class ContactSupportScreen extends StatelessWidget {
                       border: Border.all(color: primaryColor, width: 2),
                     ),
                     child: const ClipOval(
-                      child: Icon(
-                        Icons.person,
-                        size: 40,
-                        color: primaryColor,
-                      ),
+                      child: Icon(Icons.person, size: 40, color: primaryColor),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -69,10 +67,7 @@ class ContactSupportScreen extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     'Passionate Designer | Moto Traveler',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                   ),
                   const SizedBox(height: 12),
                   const Text(
@@ -86,9 +81,9 @@ class ContactSupportScreen extends StatelessWidget {
                 ],
               ),
             ),
-            
+
             const SizedBox(height: 24),
-            
+
             // Contact Info Card
             Container(
               width: double.infinity,
@@ -111,13 +106,19 @@ class ContactSupportScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   GestureDetector(
-                    onTap: () => _copyEmailToClipboard(context, 'contact.azizulislam@gmail.com'),
+                    onTap:
+                        () => _copyEmailToClipboard(
+                          context,
+                          'contact.azizulislam@gmail.com',
+                        ),
                     child: Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: primaryColor.withOpacity(0.05),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: primaryColor.withOpacity(0.3)),
+                        border: Border.all(
+                          color: primaryColor.withOpacity(0.3),
+                        ),
                       ),
                       child: Row(
                         children: [

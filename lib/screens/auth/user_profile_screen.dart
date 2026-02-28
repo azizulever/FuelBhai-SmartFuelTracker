@@ -10,6 +10,7 @@ import 'package:mileage_calculator/services/auth_service.dart';
 import 'package:mileage_calculator/utils/theme.dart';
 import 'package:mileage_calculator/widgets/main_navigation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:mileage_calculator/services/analytics_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class UserProfileScreen extends StatefulWidget {
@@ -30,6 +31,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   @override
   void initState() {
     super.initState();
+    AnalyticsService.to.logScreenView('UserProfileScreen');
     try {
       _authService = Get.find<AuthService>();
     } catch (e) {
@@ -92,7 +94,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         child: Column(
           children: [
             const SizedBox(height: 32),
-            
+
             // Profile Avatar
             Container(
               width: 120,
@@ -102,16 +104,12 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 border: Border.all(color: primaryColor, width: 3),
               ),
               child: ClipOval(
-                child: Icon(
-                  Icons.person,
-                  size: 60,
-                  color: primaryColor,
-                ),
+                child: Icon(Icons.person, size: 60, color: primaryColor),
               ),
             ),
-            
+
             const SizedBox(height: 16),
-            
+
             // User Name
             Text(
               _userName,
@@ -121,20 +119,17 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 color: primaryColor,
               ),
             ),
-            
+
             const SizedBox(height: 6),
-            
+
             // User Email
             Text(
               _userEmail,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
-              ),
+              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
             ),
-            
+
             const SizedBox(height: 40),
-            
+
             // Menu Items
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -179,7 +174,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 ],
               ),
             ),
-            
+
             const SizedBox(height: 32),
           ],
         ),
@@ -212,11 +207,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   color: primaryColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(
-                  icon,
-                  color: primaryColor,
-                  size: 22,
-                ),
+                child: Icon(icon, color: primaryColor, size: 22),
               ),
               const SizedBox(width: 16),
               Expanded(

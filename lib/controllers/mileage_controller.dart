@@ -20,6 +20,11 @@ class MileageGetxController extends GetxController {
   TripRecord? _activeTrip;
   Timer? _tripTimer;
   final int _maxHistoryEntries = 10;
+  // Tracks startTimes of trips explicitly stopped in this session.
+  // Uses startTime (immutable) instead of trip ID (changes when Firebase assigns doc ID).
+  final Set<DateTime> _locallyStoppedTripStartTimes = {};
+  // Auth state subscription — stored so it can be cancelled in onClose().
+  StreamSubscription<bool>? _authStateSubscription;
   // Services
   late final FuelingService _fuelingService;
   late final AuthService _authService;
@@ -98,8 +103,8 @@ class MileageGetxController extends GetxController {
       _updateTripRecordsFromSync();
     });
 
-    // Listen for auth state changes
-    _authService.isLoggedIn.listen((isLoggedIn) {
+    // Listen for auth state changes — store subscription so we can cancel it.
+    _authStateSubscription = _authService.isLoggedIn.listen((isLoggedIn) {
       if (isLoggedIn) {
         _syncWithFirebase();
       }
@@ -127,11 +132,87 @@ class MileageGetxController extends GetxController {
     print('🔄 MileageController: Updating trip records from sync service');
     _tripRecords.clear();
     _tripRecords.addAll(_serviceTripSync.tripRecords);
-    // Restore active trip if exists
-    _activeTrip = _tripRecords.firstWhereOrNull((trip) => trip.isActive);
-    if (_activeTrip != null) {
-      _startTripTimer();
+
+    // If the sync service is mid-fetch (isSyncing=true), tripRecords may be
+    // in a transient state (e.g., partially populated after fetchTripRecords
+    // assigned the new list). Preserve the current _activeTrip and timer
+    // entirely — we'll reconcile properly once isSyncing becomes false.
+    if (_serviceTripSync.isSyncing) {
+      update();
+      return;
     }
+
+    final syncActiveTrip = _tripRecords.firstWhereOrNull(
+      (trip) => trip.isActive,
+    );
+
+    if (syncActiveTrip != null) {
+      if (_activeTrip == null) {
+        // Guard: if this trip was explicitly stopped in the current session,
+        // ignore stale Firebase data that still shows isActive:true.
+        // Uses startTime (immutable) instead of trip ID (which changes
+        // when Firebase assigns a document ID).
+        if (_locallyStoppedTripStartTimes.contains(syncActiveTrip.startTime)) {
+          print(
+            '🚫 Ignoring stale sync isActive:true for locally stopped trip (startTime=${syncActiveTrip.startTime})',
+          );
+          // Proactively push the stopped state back so subsequent listeners
+          // see isActive:false without waiting for Firebase.
+          final idx = _tripRecords.indexWhere((t) => t.id == syncActiveTrip.id);
+          if (idx != -1) {
+            final stoppedCopy = TripRecord(
+              id: syncActiveTrip.id,
+              userId: syncActiveTrip.userId,
+              startTime: syncActiveTrip.startTime,
+              endTime: syncActiveTrip.endTime ?? DateTime.now(),
+              duration:
+                  syncActiveTrip.endTime != null
+                      ? syncActiveTrip.duration
+                      : DateTime.now().difference(syncActiveTrip.startTime),
+              costEntries: syncActiveTrip.costEntries,
+              vehicleType: syncActiveTrip.vehicleType,
+              isActive: false,
+            );
+            _tripRecords[idx] = stoppedCopy;
+            _serviceTripSync.updateTripRecord(stoppedCopy).catchError((e) {
+              print('⚠️ Failed to reconcile stopped trip in sync: $e');
+            });
+          }
+        } else {
+          // Restoring active trip (e.g., after app restart / auth sync).
+          _activeTrip = syncActiveTrip;
+          _startTripTimer();
+        }
+      } else if (_activeTrip!.id != syncActiveTrip.id) {
+        // The trip's ID changed (controller-assigned id → Firebase document id).
+        // Update the reference but keep the live duration so the display
+        // doesn't flicker back to zero.
+        _activeTrip = TripRecord(
+          id: syncActiveTrip.id,
+          userId: _activeTrip!.userId,
+          startTime: _activeTrip!.startTime,
+          endTime: _activeTrip!.endTime,
+          duration: _activeTrip!.duration, // keep live timer duration
+          costEntries: syncActiveTrip.costEntries,
+          vehicleType: _activeTrip!.vehicleType,
+          isActive: true,
+        );
+        // Mirror corrected record back into _tripRecords
+        final idx = _tripRecords.indexWhere((t) => t.id == syncActiveTrip.id);
+        if (idx != -1) _tripRecords[idx] = _activeTrip!;
+        // Timer is already running — no need to restart
+      }
+      // else: same ID, timer running correctly — nothing to do
+    } else {
+      // No active trip in the authoritative sync list → trip was stopped
+      // (either locally or from another device). Cancel the timer.
+      if (_activeTrip != null) {
+        _tripTimer?.cancel();
+        _tripTimer = null;
+        _activeTrip = null;
+      }
+    }
+
     update();
   }
 
@@ -586,7 +667,9 @@ class MileageGetxController extends GetxController {
     _saveFuelEntries();
     _serviceRecords.clear();
     _tripTimer?.cancel();
+    _tripTimer = null;
     _activeTrip = null;
+    _locallyStoppedTripStartTimes.clear();
     _tripRecords.clear();
     print('✅ Controller data cleared');
   }
@@ -688,8 +771,10 @@ class MileageGetxController extends GetxController {
     }
   }
 
-  void startTrip() async {
+  void startTrip() {
     if (_activeTrip != null) return;
+    // Clear stale stopped tracking — a new trip is beginning.
+    _locallyStoppedTripStartTimes.clear();
 
     // Get current user ID (works for both authenticated and guest mode)
     final currentUserId = _authService.getCurrentUserId();
@@ -712,24 +797,30 @@ class MileageGetxController extends GetxController {
     _activeTrip = newTrip;
     _tripRecords.insert(0, newTrip);
     _startTripTimer();
+    update(); // UI updates IMMEDIATELY — no awaits before this
 
-    // Show notification immediately with trip start time
-    await _notificationService.showTripNotification(
-      tripId: newTrip.id,
-      duration: newTrip.duration,
-      totalCost: 0,
-      costEntriesCount: 0,
-      tripStartTime: newTrip.startTime,
-    );
+    // Fire-and-forget: show notification (errors are non-fatal)
+    _notificationService
+        .showTripNotification(
+          tripId: newTrip.id,
+          duration: newTrip.duration,
+          totalCost: 0,
+          costEntriesCount: 0,
+          tripStartTime: newTrip.startTime,
+        )
+        .catchError((e) {
+          print('⚠️ Failed to show trip notification: $e');
+        });
 
-    try {
-      print('👤 Guest mode: ${_authService.isGuestMode.value}');
-      await _serviceTripSync.addTripRecord(newTrip);
-      print('✅ Trip started and saved');
-    } catch (e) {
-      print('⚠️ Trip started locally, sync failed: $e');
-    }
-    update();
+    // Fire-and-forget: sync to Firebase
+    _serviceTripSync
+        .addTripRecord(newTrip)
+        .then((_) {
+          print('✅ Trip started and saved');
+        })
+        .catchError((e) {
+          print('⚠️ Trip started locally, sync failed: $e');
+        });
   }
 
   void _startTripTimer() {
@@ -748,65 +839,91 @@ class MileageGetxController extends GetxController {
           isActive: _activeTrip!.isActive,
         );
 
-        // Update notification with current trip data
+        // Update notification with current trip data (fire-and-forget)
         final totalCost = _activeTrip!.costEntries.fold<double>(
           0,
           (sum, entry) => sum + entry.amount,
         );
-        _notificationService.showTripNotification(
-          tripId: _activeTrip!.id,
-          duration: _activeTrip!.duration,
-          totalCost: totalCost,
-          costEntriesCount: _activeTrip!.costEntries.length,
-          tripStartTime: _activeTrip!.startTime,
-        );
+        _notificationService
+            .showTripNotification(
+              tripId: _activeTrip!.id,
+              duration: _activeTrip!.duration,
+              totalCost: totalCost,
+              costEntriesCount: _activeTrip!.costEntries.length,
+              tripStartTime: _activeTrip!.startTime,
+            )
+            .catchError((e) {
+              // Non-fatal: notification failure should not affect trip tracking
+            });
 
         update();
       }
     });
   }
 
-  void stopTrip() async {
+  void stopTrip() {
     if (_activeTrip == null) return;
 
+    // ---- Synchronous state changes (no await before update()) ----
+
+    // Capture values before nulling _activeTrip
+    final tripId = _activeTrip!.id;
+    final userId = _activeTrip!.userId;
+    final startTime = _activeTrip!.startTime;
+    final costEntries = _activeTrip!.costEntries;
+    final vehicleType = _activeTrip!.vehicleType;
+
+    // Record the trip's startTime (immutable, unlike the ID which changes
+    // when Firebase assigns a document ID) so that stale sync data
+    // cannot re-activate this trip.
+    _locallyStoppedTripStartTimes.add(startTime);
+
+    // Cancel timer immediately
     _tripTimer?.cancel();
     _tripTimer = null;
 
-    // Cancel notification
-    await _notificationService.cancelTripNotification();
-
     final endTime = DateTime.now();
-    final finalDuration = endTime.difference(_activeTrip!.startTime);
+    final finalDuration = endTime.difference(startTime);
 
     final completedTrip = TripRecord(
-      id: _activeTrip!.id,
-      userId: _activeTrip!.userId,
-      startTime: _activeTrip!.startTime,
+      id: tripId,
+      userId: userId,
+      startTime: startTime,
       endTime: endTime,
       duration: finalDuration,
-      costEntries: _activeTrip!.costEntries,
-      vehicleType: _activeTrip!.vehicleType,
+      costEntries: costEntries,
+      vehicleType: vehicleType,
       isActive: false,
     );
 
-    // Update the trip in the list
-    final index = _tripRecords.indexWhere((t) => t.id == _activeTrip!.id);
+    // Update the trip in the local list
+    final index = _tripRecords.indexWhere((t) => t.id == tripId);
     if (index != -1) {
       _tripRecords[index] = completedTrip;
     }
 
     _activeTrip = null;
+    update(); // UI updates IMMEDIATELY — no awaits before this
 
-    try {
-      await _serviceTripSync.updateTripRecord(completedTrip);
-      print('✅ Trip stopped and synced to Firebase');
-    } catch (e) {
-      print('⚠️ Trip stopped locally, sync failed: $e');
-    }
-    update();
+    // ---- Fire-and-forget async I/O (non-fatal errors) ----
+
+    // Cancel notification
+    _notificationService.cancelTripNotification().catchError((e) {
+      print('⚠️ Failed to cancel notification: $e');
+    });
+
+    // Sync to Firebase
+    _serviceTripSync
+        .updateTripRecord(completedTrip)
+        .then((_) {
+          print('✅ Trip stopped and synced to Firebase');
+        })
+        .catchError((e) {
+          print('⚠️ Trip stopped locally, sync failed: $e');
+        });
   }
 
-  void addTripCost(double amount, String description) async {
+  void addTripCost(double amount, String description) {
     if (_activeTrip == null) return;
 
     final newCostEntry = TripCostEntry(
@@ -837,29 +954,39 @@ class MileageGetxController extends GetxController {
       _tripRecords[index] = _activeTrip!;
     }
 
-    // Update notification with new cost
-    final totalCost = _activeTrip!.costEntries.fold<double>(
+    // Capture current state for async operations
+    final currentTrip = _activeTrip!;
+    update(); // UI updates IMMEDIATELY
+
+    // Fire-and-forget: update notification
+    final totalCost = currentTrip.costEntries.fold<double>(
       0,
       (sum, entry) => sum + entry.amount,
     );
-    await _notificationService.showTripNotification(
-      tripId: _activeTrip!.id,
-      duration: _activeTrip!.duration,
-      totalCost: totalCost,
-      costEntriesCount: _activeTrip!.costEntries.length,
-      tripStartTime: _activeTrip!.startTime,
-    );
+    _notificationService
+        .showTripNotification(
+          tripId: currentTrip.id,
+          duration: currentTrip.duration,
+          totalCost: totalCost,
+          costEntriesCount: currentTrip.costEntries.length,
+          tripStartTime: currentTrip.startTime,
+        )
+        .catchError((e) {
+          print('⚠️ Failed to update notification: $e');
+        });
 
-    try {
-      await _serviceTripSync.updateTripRecord(_activeTrip!);
-      print('✅ Trip cost added and synced: ৳$amount');
-    } catch (e) {
-      print('⚠️ Trip cost added locally, sync failed: $e');
-    }
-    update();
+    // Fire-and-forget: sync to Firebase
+    _serviceTripSync
+        .updateTripRecord(currentTrip)
+        .then((_) {
+          print('✅ Trip cost added and synced: ৳$amount');
+        })
+        .catchError((e) {
+          print('⚠️ Trip cost added locally, sync failed: $e');
+        });
   }
 
-  void deleteTripCostEntry(String costEntryId) async {
+  void deleteTripCostEntry(String costEntryId) {
     if (_activeTrip == null) return;
 
     final updatedCostEntries =
@@ -884,13 +1011,19 @@ class MileageGetxController extends GetxController {
       _tripRecords[index] = _activeTrip!;
     }
 
-    try {
-      await _serviceTripSync.updateTripRecord(_activeTrip!);
-      print('✅ Trip cost entry deleted and synced');
-    } catch (e) {
-      print('⚠️ Trip cost entry deleted locally, sync failed: $e');
-    }
-    update();
+    // Capture for async
+    final currentTrip = _activeTrip!;
+    update(); // UI updates IMMEDIATELY
+
+    // Fire-and-forget: sync to Firebase
+    _serviceTripSync
+        .updateTripRecord(currentTrip)
+        .then((_) {
+          print('✅ Trip cost entry deleted and synced');
+        })
+        .catchError((e) {
+          print('⚠️ Trip cost entry deleted locally, sync failed: $e');
+        });
   }
 
   void deleteTripRecord(TripRecord trip) async {
@@ -914,6 +1047,7 @@ class MileageGetxController extends GetxController {
 
   @override
   void onClose() {
+    _authStateSubscription?.cancel();
     _tripTimer?.cancel();
     super.onClose();
   }
