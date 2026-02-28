@@ -1,6 +1,6 @@
 plugins {
     // Add the Google services Gradle plugin (do not apply here, just declare)
-    id("com.google.gms.google-services") version "4.3.15" apply false
+    id("com.google.gms.google-services") version "4.4.2" apply false
 }
 
 allprojects {
