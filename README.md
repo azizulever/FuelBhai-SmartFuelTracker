@@ -1,62 +1,24 @@
-# FuelBhai - Smart Fuel Tracker 
- 
-**FuelBhai (Beta)** is a clean, efficient, and intuitive fuel tracking application designed to help users monitor fuel consumption, mileage, and fuel expenses with ease.  
+# FuelBhai – Smart Fuel Tracker
 
----
+A simple mobile app to track your vehicle's fuel usage, mileage, and expenses.
 
-## Features 
+## What It Does
 
-- Support for tracking both **cars** and **motorcycles** 
-- Calculation of **average** and **latest mileage** (km/L)
-- Monitoring of **fuel expenses** and **price per liter**
-- Access to a detailed **fueling history** with sorting options: 
-  - All records  
-  - Most recent  
-  - Best mileage
-- Comprehensive **fuel statistics**, including:
-  - Total fuel consumed  
-  - Total expenditure  
-  - Total distance traveled
-- User-friendly and responsive **interface**
-- Smooth **animations** for dialogs and transitions
+- **Track Fuel Entries** – Log every fuel fill-up with liters, cost, and odometer reading.
+- **Mileage Calculator** – Automatically calculates your vehicle's mileage and fuel efficiency.
+- **Service Records** – Keep a record of vehicle servicing and maintenance.
+- **Trip Tracking** – Track trips with duration and cost.
+- **Nearby Fuel Stations** – Find fuel stations near your current location on a map.
+- **Supports Bike & Car** – Switch between vehicle types easily.
 
----
+## How Data Works
 
-## How It Works 
+- **With Google Sign-In** – Your data syncs to the cloud and is backed up automatically.
+- **Guest Mode** – Use the app without an account. Data is stored locally on your device. You can sign in later to sync everything to the cloud.
 
-Users can log detailed fuel entries, including:
+## Built With
 
-- Date of fueling  
-- Odometer reading  
-- Fuel quantity (liters)  
-- Total cost
-
-The application automatically calculates:
-
-- Mileage (km/L)  
-- Fuel efficiency metrics
-
-These insights help users track performance trends and manage fuel costs effectively.
-
----
-
-## Tech Stack
-
-- **Flutter** (cross-platform mobile development)
-- **Clean architecture** with state management 
-- Responsive UI with modern animation practices
-
----
-
-## Security & Data Privacy
-
-FuelBhai is built with performance and privacy in mind. No personal or sensitive user data is collected or shared.
-
----
-
-## Planned Enhancements
-
-- Cloud backup and sync
-- Multi-vehicle tracking
-- Data export (CSV, Excel)
-- Dark mode support
+- Flutter & Dart
+- Firebase (Auth, Firestore, Analytics, Crashlytics)
+- Google Sign-In
+- GetX (state management)

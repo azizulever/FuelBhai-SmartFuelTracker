@@ -90,7 +90,7 @@ class _SplashScreenState extends State<SplashScreen>
                     ),
                   ),
                   Text(
-                    'Copyright ©️2025, FuelBhai',
+                    'Copyright ©️2026, FuelBhai',
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.grey[600],
