@@ -74,19 +74,50 @@ class _AuthWrapperState extends State<AuthWrapper> {
   }
 
   Future<void> _checkAuthState() async {
-    await Future.delayed(const Duration(seconds: 3)); // Splash screen duration
+    // Minimum splash display time so it doesn't flash away instantly
+    final minSplash = Future.delayed(const Duration(milliseconds: 1500));
 
     final prefs = await SharedPreferences.getInstance();
     final onboardingCompleted = prefs.getBool('onboarding_completed') ?? false;
     final skippedLogin = prefs.getBool('skipped_login') ?? false;
 
-    // Initialize auth service and get current Firebase user
+    // Get current Firebase user
     Get.find<AuthService>();
     final currentUser = FirebaseAuth.instance.currentUser;
 
+    // Start data fetching/syncing immediately and wait for it to finish
+    // (with a 10-second timeout so we never hang on the splash screen).
+    // Also run the minimum splash delay in parallel.
+    if (onboardingCompleted) {
+      if (skippedLogin && currentUser == null) {
+        // Guest mode — load local data
+        await Future.wait([
+          minSplash,
+          Future.any([
+            _loadGuestDataOnStartup(),
+            Future.delayed(const Duration(seconds: 10)),
+          ]),
+        ]);
+      } else if (currentUser != null) {
+        // Logged-in user — sync from Firebase
+        await Future.wait([
+          minSplash,
+          Future.any([
+            _syncDataOnStartup(),
+            Future.delayed(const Duration(seconds: 10)),
+          ]),
+        ]);
+      } else {
+        // Not onboarded but no user — just wait for min splash
+        await minSplash;
+      }
+    } else {
+      // First time user — just wait for min splash
+      await minSplash;
+    }
+
     // Determine which screen to show
     if (!onboardingCompleted) {
-      // First time user - show onboarding
       if (mounted) {
         setState(() {
           _shouldShowOnboarding = true;
@@ -95,7 +126,6 @@ class _AuthWrapperState extends State<AuthWrapper> {
         });
       }
     } else if (skippedLogin || currentUser != null) {
-      // User has completed onboarding and either skipped login or is logged in
       if (mounted) {
         setState(() {
           _shouldShowOnboarding = false;
@@ -105,15 +135,9 @@ class _AuthWrapperState extends State<AuthWrapper> {
       }
 
       if (skippedLogin && currentUser == null) {
-        // Guest mode - load local data
-        await _loadGuestDataOnStartup();
         _showDataWarningSnackbar();
-      } else if (currentUser != null) {
-        // User is logged in, trigger data sync
-        _syncDataOnStartup();
       }
     } else {
-      // User has completed onboarding but not logged in or skipped
       if (mounted) {
         setState(() {
           _shouldShowOnboarding = false;
@@ -132,22 +156,21 @@ class _AuthWrapperState extends State<AuthWrapper> {
       if (!authService.isGuestMode.value) {
         await authService.enableGuestMode();
       }
-
-      // Add a small delay to ensure services are fully initialized
-      await Future.delayed(const Duration(milliseconds: 300));
     } catch (e) {}
   }
 
   Future<void> _syncDataOnStartup() async {
     try {
       final fuelingService = Get.find<FuelingService>();
-
-      // Add a small delay to ensure services are fully initialized
-      await Future.delayed(const Duration(milliseconds: 500));
-
       await fuelingService.syncFromFirebaseToOffline();
+
+      // Also sync service & trip records
+      try {
+        final serviceTripSync = Get.find<ServiceTripSyncService>();
+        await serviceTripSync.syncFromFirebase();
+      } catch (_) {}
     } catch (e) {
-      // Don't show error to user on startup - just log it
+      // Don't show error to user on startup
     }
   }
 
