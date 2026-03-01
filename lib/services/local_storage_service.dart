@@ -42,9 +42,7 @@ class LocalStorageService {
       final jsonData =
           records.map((record) => jsonEncode(record.toJson())).toList();
       await prefs.setStringList(_guestFuelingRecordsKey, jsonData);
-      print('✅ LocalStorage: Saved ${records.length} fueling records');
     } catch (e) {
-      print('❌ LocalStorage: Error saving fueling records: $e');
       rethrow;
     }
   }
@@ -60,11 +58,8 @@ class LocalStorageService {
             final jsonMap = json.decode(jsonStr) as Map<String, dynamic>;
             return FuelingRecord.fromJson(jsonMap);
           }).toList();
-
-      print('✅ LocalStorage: Loaded ${records.length} fueling records');
       return records;
     } catch (e) {
-      print('❌ LocalStorage: Error loading fueling records: $e');
       return [];
     }
   }
@@ -97,7 +92,6 @@ class LocalStorageService {
   Future<void> clearFuelingRecords() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_guestFuelingRecordsKey);
-    print('✅ LocalStorage: Cleared all fueling records');
   }
 
   // ========== SERVICE RECORDS ==========
@@ -109,9 +103,7 @@ class LocalStorageService {
       final jsonData =
           records.map((record) => jsonEncode(record.toJson())).toList();
       await prefs.setStringList(_guestServiceRecordsKey, jsonData);
-      print('✅ LocalStorage: Saved ${records.length} service records');
     } catch (e) {
-      print('❌ LocalStorage: Error saving service records: $e');
       rethrow;
     }
   }
@@ -127,11 +119,8 @@ class LocalStorageService {
             final jsonMap = json.decode(jsonStr) as Map<String, dynamic>;
             return ServiceRecord.fromJson(jsonMap);
           }).toList();
-
-      print('✅ LocalStorage: Loaded ${records.length} service records');
       return records;
     } catch (e) {
-      print('❌ LocalStorage: Error loading service records: $e');
       return [];
     }
   }
@@ -164,7 +153,6 @@ class LocalStorageService {
   Future<void> clearServiceRecords() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_guestServiceRecordsKey);
-    print('✅ LocalStorage: Cleared all service records');
   }
 
   // ========== TRIP RECORDS ==========
@@ -176,9 +164,7 @@ class LocalStorageService {
       final jsonData =
           records.map((record) => jsonEncode(record.toJson())).toList();
       await prefs.setStringList(_guestTripRecordsKey, jsonData);
-      print('✅ LocalStorage: Saved ${records.length} trip records');
     } catch (e) {
-      print('❌ LocalStorage: Error saving trip records: $e');
       rethrow;
     }
   }
@@ -194,11 +180,8 @@ class LocalStorageService {
             final jsonMap = json.decode(jsonStr) as Map<String, dynamic>;
             return TripRecord.fromJson(jsonMap);
           }).toList();
-
-      print('✅ LocalStorage: Loaded ${records.length} trip records');
       return records;
     } catch (e) {
-      print('❌ LocalStorage: Error loading trip records: $e');
       return [];
     }
   }
@@ -231,7 +214,6 @@ class LocalStorageService {
   Future<void> clearTripRecords() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_guestTripRecordsKey);
-    print('✅ LocalStorage: Cleared all trip records');
   }
 
   // ========== CLEAR ALL DATA ==========
@@ -242,6 +224,5 @@ class LocalStorageService {
     await clearServiceRecords();
     await clearTripRecords();
     await clearGuestUserId();
-    print('✅ LocalStorage: Cleared all guest data');
   }
 }

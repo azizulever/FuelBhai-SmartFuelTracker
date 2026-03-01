@@ -1,5 +1,6 @@
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:get/get.dart';
+import 'package:mileage_calculator/services/crashlytics_service.dart';
 
 /// Centralized analytics service for tracking screen views and user events.
 /// Register once via Get.put() and use Get.find<AnalyticsService>() anywhere.
@@ -22,6 +23,8 @@ class AnalyticsService extends GetxService {
       screenName: screenName,
       screenClass: screenClass ?? screenName,
     );
+    // Also set Crashlytics context so crash reports show the current screen
+    CrashlyticsService.to.setCurrentScreen(screenName);
   }
 
   // ──────────────────────────── Auth events ────────────────────────────────

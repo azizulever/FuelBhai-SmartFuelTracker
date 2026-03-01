@@ -13,10 +13,15 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:mileage_calculator/firebase_options.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:mileage_calculator/services/analytics_service.dart';
+import 'package:mileage_calculator/services/crashlytics_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // Initialize Crashlytics global error handlers
+  Get.put(CrashlyticsService());
+  await CrashlyticsService.init();
 
   // Initialize Analytics service
   Get.put(AnalyticsService());
@@ -76,7 +81,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
     final skippedLogin = prefs.getBool('skipped_login') ?? false;
 
     // Initialize auth service and get current Firebase user
-    final authService = Get.find<AuthService>();
+    Get.find<AuthService>();
     final currentUser = FirebaseAuth.instance.currentUser;
 
     // Determine which screen to show
@@ -101,7 +106,6 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
       if (skippedLogin && currentUser == null) {
         // Guest mode - load local data
-        print('👤 Guest mode detected, loading local data...');
         await _loadGuestDataOnStartup();
         _showDataWarningSnackbar();
       } else if (currentUser != null) {
@@ -122,7 +126,6 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
   Future<void> _loadGuestDataOnStartup() async {
     try {
-      print('📥 App startup: Loading guest data from local storage...');
       final authService = Get.find<AuthService>();
 
       // Ensure guest mode is enabled
@@ -132,25 +135,18 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
       // Add a small delay to ensure services are fully initialized
       await Future.delayed(const Duration(milliseconds: 300));
-
-      print('✅ Guest mode initialized, services will load data automatically');
-    } catch (e) {
-      print('❌ Error during guest data load: $e');
-    }
+    } catch (e) {}
   }
 
   Future<void> _syncDataOnStartup() async {
     try {
-      print('🔄 App startup: Syncing data for logged-in user...');
       final fuelingService = Get.find<FuelingService>();
 
       // Add a small delay to ensure services are fully initialized
       await Future.delayed(const Duration(milliseconds: 500));
 
       await fuelingService.syncFromFirebaseToOffline();
-      print('✅ Startup data sync completed');
     } catch (e) {
-      print('❌ Error during startup data sync: $e');
       // Don't show error to user on startup - just log it
     }
   }

@@ -19,13 +19,6 @@ class VehicleTypeSelector extends StatelessWidget {
     return 20.0; // Large phones and tablets
   }
 
-  double _getButtonHorizontalPadding(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    if (width < 360) return 32.0; // Small phones
-    if (width < 400) return 48.0; // Medium phones
-    return 62.0; // Large phones and tablets
-  }
-
   double _getButtonFontSize(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
     if (width < 360) return 14.0; // Small phones

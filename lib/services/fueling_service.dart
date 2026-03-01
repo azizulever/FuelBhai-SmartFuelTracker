@@ -20,65 +20,45 @@ class FuelingService extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    print('🚀 FuelingService: Initializing...');
-
     // Initialize AuthService
     try {
       _authService = Get.find<AuthService>();
-      print('✅ AuthService found successfully');
     } catch (e) {
-      print('⚠️ AuthService not found, creating new instance');
       _authService = Get.put(AuthService());
-      print('✅ New AuthService created');
     }
 
     // Don't load offline data on init - it may contain other users' data
     // Data will be loaded via auth state listener when user logs in
-    print(
-      '⏸️ Skipping offline data load on init to prevent cross-user contamination',
-    );
-
     if (_authService.isLoggedIn.value) {
-      print('👤 User is logged in, fetching Firebase records');
       // Clear any existing data first
       fuelingRecords.clear();
       fetchFuelingRecords();
     } else if (_authService.isGuestMode.value) {
-      print('👤 Guest mode active, loading local records');
       fuelingRecords.clear();
       _loadGuestData();
     } else {
-      print('👤 User not logged in, ensuring empty state');
       fuelingRecords.clear();
     }
 
     // Listen for auth state changes to refresh records
-    print('👂 Setting up auth state listener...');
     _authService.isLoggedIn.listen((isLoggedIn) {
-      print('🔄 Auth state changed: isLoggedIn = $isLoggedIn');
       if (isLoggedIn) {
-        print(
-          '✅ User logged in, clearing old data and fetching fresh from Firebase',
-        );
         // Clear any existing data first to prevent contamination
         fuelingRecords.clear();
-        // Small delay to ensure auth state is fully stable
-        Future.delayed(const Duration(milliseconds: 300), () {
+        // Wait for any guest→Firebase migration to finish before fetching
+        Future.delayed(const Duration(milliseconds: 500), () async {
+          // If migration is still running, wait for it
+          while (_authService.isMigrating) {
+            await Future.delayed(const Duration(milliseconds: 200));
+          }
           if (_authService.isLoggedIn.value &&
               _authService.user.value != null) {
-            print(
-              '📥 Auth listener: fetching records from Firebase for user: ${_authService.user.value!.uid}',
-            );
             fetchFuelingRecords().then((_) {
-              print(
-                '✅ Auth listener: Fetch completed, records count: ${fuelingRecords.length}',
-              );
               _processPendingOperations();
             });
           }
         });
       } else {
-        print('❌ User logged out, clearing all data');
         fuelingRecords.clear();
         pendingOperations.clear();
         _clearAllLocalData();
@@ -87,37 +67,25 @@ class FuelingService extends GetxController {
 
     // Listen for guest mode changes
     _authService.isGuestMode.listen((isGuest) {
-      print('🔄 Guest mode changed: isGuest = $isGuest');
       if (isGuest && !_authService.isLoggedIn.value) {
-        print('👤 Guest mode activated, loading local data');
         fuelingRecords.clear();
         _loadGuestData();
       }
     });
-
-    print('🎉 FuelingService initialization completed');
   }
 
   Future<void> _loadOfflineData() async {
-    print('💾 Loading offline data...');
     try {
       // Only load offline data if user is logged in
       if (!_authService.isLoggedIn.value || _authService.user.value == null) {
-        print('⚠️ User not logged in, skipping offline data load');
         return;
       }
 
       final currentUserId = _authService.user.value!.uid;
-      print('👤 Loading offline data for user: $currentUserId');
-
       final prefs = await SharedPreferences.getInstance();
       // Use user-specific key for better data isolation
       final userSpecificKey = 'offline_fueling_records_$currentUserId';
       final offlineData = prefs.getStringList(userSpecificKey) ?? [];
-      print(
-        '📊 Found ${offlineData.length} offline records for user-specific key',
-      );
-
       if (offlineData.isNotEmpty) {
         final records =
             offlineData.map((jsonStr) {
@@ -128,41 +96,24 @@ class FuelingService extends GetxController {
         // Double-check: Filter records for current user ONLY (safety check)
         final userSpecificRecords =
             records.where((record) => record.userId == currentUserId).toList();
-
-        print(
-          '🔍 Loaded ${userSpecificRecords.length} records for user: $currentUserId',
-        );
-
         fuelingRecords.value = userSpecificRecords;
-        print('✅ Loaded ${userSpecificRecords.length} offline records');
-      } else {
-        print('ℹ️ No offline records found for this user');
-      }
+      } else {}
 
       // Load pending operations with user-specific key
       final pendingKey = 'pending_operations_$currentUserId';
       final pendingData = prefs.getStringList(pendingKey) ?? [];
-      print('📊 Found ${pendingData.length} pending operations for this user');
-
       pendingOperations.value =
           pendingData.map((jsonStr) {
-            print('📄 Processing pending operation: $jsonStr');
             return Map<String, dynamic>.from(json.decode(jsonStr));
           }).toList();
-
-      print('✅ Loaded ${pendingOperations.length} pending operations');
-    } catch (e) {
-      print('❌ Error loading offline data: $e');
-    }
+    } catch (e) {}
   }
 
   Future<void> _saveOfflineData() async {
-    print('💾 Saving offline data...');
     try {
       // Get current user ID for user-specific storage
       final currentUserId = _authService.getCurrentUserId();
       if (currentUserId.isEmpty) {
-        print('⚠️ No user ID available, skipping offline save');
         return;
       }
 
@@ -170,29 +121,20 @@ class FuelingService extends GetxController {
       final jsonData =
           fuelingRecords.map((record) {
             final jsonObj = record.toJson(); // Use toJson instead of toMap
-            print('📄 Saving record: $jsonObj');
             return jsonEncode(jsonObj);
           }).toList();
 
       // Use user-specific key for data isolation
       final userSpecificKey = 'offline_fueling_records_$currentUserId';
       await prefs.setStringList(userSpecificKey, jsonData);
-      print(
-        '✅ Saved ${jsonData.length} records to offline storage for user: $currentUserId',
-      );
-    } catch (e) {
-      print('❌ Error saving offline data: $e');
-    }
+    } catch (e) {}
   }
 
   Future<void> _savePendingOperation(Map<String, dynamic> operation) async {
-    print('📝 Saving pending operation...');
-    print('📊 Operation: $operation');
     try {
       // Get current user ID for user-specific storage
       final currentUserId = _authService.getCurrentUserId();
       if (currentUserId.isEmpty) {
-        print('⚠️ No user ID available, skipping pending operation save');
         return;
       }
 
@@ -200,23 +142,16 @@ class FuelingService extends GetxController {
       final prefs = await SharedPreferences.getInstance();
       final jsonData =
           pendingOperations.map((op) {
-            print('📄 Saving pending op: $op');
             return jsonEncode(op);
           }).toList();
 
       // Use user-specific key for data isolation
       final pendingKey = 'pending_operations_$currentUserId';
       await prefs.setStringList(pendingKey, jsonData);
-      print(
-        '✅ Saved ${jsonData.length} pending operations for user: $currentUserId',
-      );
-    } catch (e) {
-      print('❌ Error saving pending operation: $e');
-    }
+    } catch (e) {}
   }
 
   Future<void> _clearAllLocalData() async {
-    print('🧹 Clearing all local data...');
     try {
       final prefs = await SharedPreferences.getInstance();
 
@@ -227,45 +162,27 @@ class FuelingService extends GetxController {
         // Clear user-specific offline records
         final userSpecificKey = 'offline_fueling_records_$currentUserId';
         await prefs.remove(userSpecificKey);
-        print('✅ Cleared user-specific offline fueling records');
-
         // Clear user-specific pending operations
         final pendingKey = 'pending_operations_$currentUserId';
         await prefs.remove(pendingKey);
-        print('✅ Cleared user-specific pending operations');
       }
 
       // Clear legacy global keys (for backward compatibility)
       await prefs.remove('offline_fueling_records');
       await prefs.remove('pending_operations');
-      print('✅ Cleared legacy global keys');
-
       // Clear fuel entries from controller
       await prefs.remove('fuel_entries');
-      print('✅ Cleared fuel entries');
-
       // Clear vehicle type
       await prefs.remove('vehicle_type');
-      print('✅ Cleared vehicle type');
-
       // Clear in-memory data
       fuelingRecords.clear();
       pendingOperations.clear();
-      print('✅ Cleared in-memory data');
-
       // Clear controller data if available
       try {
         final mileageController = Get.find<MileageGetxController>();
         mileageController.clearAllData();
-        print('✅ Cleared controller data');
-      } catch (e) {
-        print('ℹ️ MileageController not found or already cleared');
-      }
-
-      print('🎉 All local data cleared successfully');
-    } catch (e) {
-      print('❌ Error clearing local data: $e');
-    }
+      } catch (e) {}
+    } catch (e) {}
   }
 
   Future<void> _processPendingOperations() async {
@@ -298,26 +215,19 @@ class FuelingService extends GetxController {
         final prefs = await SharedPreferences.getInstance();
         final pendingKey = 'pending_operations_$currentUserId';
         await prefs.setStringList(pendingKey, []);
-        print('✅ Cleared pending operations for user: $currentUserId');
       }
-    } catch (e) {
-      print('Error processing pending operations: $e');
-    }
+    } catch (e) {}
   }
 
   Future<void> _executePendingAdd(Map<String, dynamic> operation) async {
     try {
       final recordData = operation['data'];
-      print('🔄 Executing pending add with data: $recordData');
-
       // Convert the stored data back to FuelingRecord, then to Firebase format
       final record = FuelingRecord.fromJson(recordData);
       await _firestore
           .collection('fueling_records')
           .add(record.toMap()); // Use toMap for Firebase
-      print('✅ Pending add executed successfully');
     } catch (e) {
-      print('❌ Failed to execute pending add: $e');
       throw e;
     }
   }
@@ -326,19 +236,13 @@ class FuelingService extends GetxController {
     try {
       final recordId = operation['id'];
       final recordData = operation['data'];
-      print(
-        '🔄 Executing pending update for ID: $recordId with data: $recordData',
-      );
-
       // Convert the stored data back to FuelingRecord, then to Firebase format
       final record = FuelingRecord.fromJson(recordData);
       await _firestore
           .collection('fueling_records')
           .doc(recordId)
           .update(record.toMap()); // Use toMap for Firebase
-      print('✅ Pending update executed successfully');
     } catch (e) {
-      print('❌ Failed to execute pending update: $e');
       throw e;
     }
   }
@@ -348,36 +252,23 @@ class FuelingService extends GetxController {
       final recordId = operation['id'];
       await _firestore.collection('fueling_records').doc(recordId).delete();
     } catch (e) {
-      print('Failed to execute pending delete: $e');
       throw e;
     }
   }
 
   // Public method for explicit sync calls (bypasses auth listener delay)
   Future<void> forceFetchFuelingRecords() async {
-    print('⚡ FuelingService: Force fetching records (explicit call)');
     return fetchFuelingRecords();
   }
 
   Future<void> fetchFuelingRecords() async {
-    print('🔄 FuelingService: Starting fetchFuelingRecords');
-
     try {
       isLoading.value = true;
-      print('⏳ Loading state set to true');
-
       String userId = _authService.user.value?.uid ?? '';
-      print('👤 Current user ID: $userId');
-
       if (userId.isEmpty) {
-        print('❌ User ID is empty, returning');
         isLoading.value = false;
         return;
       }
-
-      print('🔥 Querying Firebase collection: fueling_records');
-      print('🔍 Filter: userId == $userId');
-
       // Use a more efficient query - try with orderBy first, fallback if needed
       QuerySnapshot snapshot;
       try {
@@ -389,19 +280,12 @@ class FuelingService extends GetxController {
                 .get();
       } catch (e) {
         // If index doesn't exist, query without orderBy and sort locally
-        print(
-          '⚠️ Composite index not found, querying without orderBy and sorting locally',
-        );
         snapshot =
             await _firestore
                 .collection('fueling_records')
                 .where('userId', isEqualTo: userId)
                 .get();
       }
-
-      print('📊 Firebase query completed');
-      print('📄 Documents found: ${snapshot.docs.length}');
-
       // Only process documents that belong to the current user (extra safety check)
       final records =
           snapshot.docs
@@ -410,71 +294,39 @@ class FuelingService extends GetxController {
                 return data['userId'] == userId; // Ensure user-specific data
               })
               .map((doc) {
-                print('📄 Processing document: ${doc.id}');
                 final data = doc.data() as Map<String, dynamic>;
-                print('📊 Document data: $data');
                 return FuelingRecord.fromMap(data, doc.id);
               })
               .toList();
 
       // Sort locally by date (descending) to ensure proper order
       records.sort((a, b) => b.date.compareTo(a.date));
-
-      print(
-        '✅ Converted ${records.length} user-specific documents to FuelingRecord objects',
-      );
-
       // Update reactive list
       fuelingRecords.value = records;
-      print('📊 fuelingRecords updated with ${fuelingRecords.length} records');
-
       // Force notify reactive listeners
       fuelingRecords.refresh();
-      print('🔔 Reactive listeners notified');
-
       // Save to offline storage (local cache)
-      print('💾 Saving ${records.length} records to offline storage...');
       await _saveOfflineData();
-      print('✅ Offline save completed - data cached locally');
-
       isOnline.value = true;
-      print('🌐 Online status set to true');
     } catch (e) {
-      print('❌ Firebase fetch FAILED: $e');
-      print('📝 Error type: ${e.runtimeType}');
-      print('📋 Error details: ${e.toString()}');
-
       // Check if this is a Firestore index error - handle silently
       if (e.toString().contains('requires an index')) {
-        print('🔗 Firestore index required - using fallback query');
         // No user-facing message - handle gracefully in background
       }
 
       isOnline.value = false;
-      print('🌐 Online status set to false');
-
       // Load from offline storage if online fetch fails
-      print('💾 Loading from offline storage as fallback...');
       await _loadOfflineData();
-      print('✅ Offline data loaded');
     } finally {
       isLoading.value = false;
-      print('⏳ Loading state set to false');
-      print('🏁 fetchFuelingRecords completed');
     }
   }
 
   Future<String> addFuelingRecord(FuelingRecord record) async {
-    print('🔄 FuelingService: Starting addFuelingRecord');
-    print('📊 Record details: ${record.toMap()}');
-
     try {
       isLoading.value = true;
-      print('⏳ Loading state set to true');
-
       // Check if user is in guest mode
       if (_authService.isGuestMode.value && !_authService.isLoggedIn.value) {
-        print('👤 Guest mode: Saving to local storage');
         final tempId = DateTime.now().millisecondsSinceEpoch.toString();
         final guestUserId = _authService.getCurrentUserId();
 
@@ -492,22 +344,15 @@ class FuelingService extends GetxController {
         await _localStorageService.addFuelingRecord(guestRecord);
         fuelingRecords.insert(0, guestRecord);
         fuelingRecords.sort((a, b) => b.date.compareTo(a.date));
-        print('✅ Guest record saved locally with ID: $tempId');
         return tempId;
       }
 
       // Firebase mode (authenticated user)
       if (_authService.user.value == null) {
-        print('❌ User not logged in - throwing exception');
         throw Exception('User not logged in');
       }
-
-      print('✅ User is logged in: ${_authService.user.value!.uid}');
-
       // Add to local list immediately (optimistic update)
       final tempId = DateTime.now().millisecondsSinceEpoch.toString();
-      print('🔢 Generated temp ID: $tempId');
-
       final localRecord = FuelingRecord(
         id: tempId,
         userId: record.userId,
@@ -518,30 +363,17 @@ class FuelingService extends GetxController {
         notes: record.notes,
         vehicleId: record.vehicleId,
       );
-
-      print('💾 Adding to local list (optimistic update)');
       fuelingRecords.insert(0, localRecord);
       fuelingRecords.sort((a, b) => b.date.compareTo(a.date));
       await _saveOfflineData();
-      print('✅ Local save completed');
-
       try {
         // Try to add to Firebase
-        print('🔥 Attempting to save to Firebase...');
-        print('🔥 Collection: fueling_records');
-        print('🔥 Data to save: ${record.toMap()}');
-
         final docRef = await _firestore
             .collection('fueling_records')
             .add(record.toMap());
-        print('🎉 Firebase save SUCCESS! Document ID: ${docRef.id}');
-
         // Update local record with real ID
         final index = fuelingRecords.indexWhere((r) => r.id == tempId);
-        print('🔍 Looking for temp record at index: $index');
-
         if (index != -1) {
-          print('🔄 Updating local record with Firebase ID');
           fuelingRecords[index] = FuelingRecord(
             id: docRef.id,
             userId: record.userId,
@@ -553,41 +385,24 @@ class FuelingService extends GetxController {
             vehicleId: record.vehicleId,
           );
           await _saveOfflineData();
-          print('✅ Local record updated with Firebase ID');
         }
 
         isOnline.value = true;
-        print('🌐 Online status set to true');
-        print('🎯 Returning Firebase document ID: ${docRef.id}');
         return docRef.id;
       } catch (e) {
-        print('❌ Firebase save FAILED: $e');
-        print('📝 Error type: ${e.runtimeType}');
-        print('📋 Error details: ${e.toString()}');
-
         isOnline.value = false;
-        print('🌐 Online status set to false');
-
         // Save as pending operation
-        print('📝 Saving as pending operation...');
         await _savePendingOperation({
           'type': 'add',
           'data': record.toJson(), // Use toJson for local storage
           'tempId': tempId,
         });
-        print('✅ Pending operation saved');
-
         return tempId;
       }
     } catch (e) {
-      print('💥 CRITICAL ERROR in addFuelingRecord: $e');
-      print('📝 Error type: ${e.runtimeType}');
-      print('📋 Error details: ${e.toString()}');
       throw e;
     } finally {
       isLoading.value = false;
-      print('⏳ Loading state set to false');
-      print('🏁 addFuelingRecord completed');
     }
   }
 
@@ -601,14 +416,12 @@ class FuelingService extends GetxController {
 
       // Check if user is in guest mode
       if (_authService.isGuestMode.value && !_authService.isLoggedIn.value) {
-        print('👤 Guest mode: Updating local storage');
         await _localStorageService.updateFuelingRecord(record);
 
         final index = fuelingRecords.indexWhere((r) => r.id == record.id);
         if (index != -1) {
           fuelingRecords[index] = record;
         }
-        print('✅ Guest record updated locally');
         return;
       }
 
@@ -628,7 +441,6 @@ class FuelingService extends GetxController {
 
         isOnline.value = true;
       } catch (e) {
-        print('Failed to sync update with Firebase, saved locally: $e');
         isOnline.value = false;
 
         // Save as pending operation
@@ -639,7 +451,6 @@ class FuelingService extends GetxController {
         });
       }
     } catch (e) {
-      print('Error updating fueling record: $e');
       throw e;
     } finally {
       isLoading.value = false;
@@ -652,10 +463,8 @@ class FuelingService extends GetxController {
 
       // Check if user is in guest mode
       if (_authService.isGuestMode.value && !_authService.isLoggedIn.value) {
-        print('👤 Guest mode: Deleting from local storage');
         await _localStorageService.deleteFuelingRecord(recordId);
         fuelingRecords.removeWhere((r) => r.id == recordId);
-        print('✅ Guest record deleted locally');
         return;
       }
 
@@ -669,14 +478,12 @@ class FuelingService extends GetxController {
 
         isOnline.value = true;
       } catch (e) {
-        print('Failed to sync delete with Firebase, removed locally: $e');
         isOnline.value = false;
 
         // Save as pending operation
         await _savePendingOperation({'type': 'delete', 'id': recordId});
       }
     } catch (e) {
-      print('Error deleting fueling record: $e');
       throw e;
     } finally {
       isLoading.value = false;
@@ -707,9 +514,7 @@ class FuelingService extends GetxController {
 
         await addFuelingRecord(fuelingRecord);
       }
-    } catch (e) {
-      print('Error syncing local data to Firebase: $e');
-    }
+    } catch (e) {}
   }
 
   // Manual sync method
@@ -724,44 +529,27 @@ class FuelingService extends GetxController {
 
   // Method specifically for syncing data from Firebase to offline after login
   Future<void> syncFromFirebaseToOffline() async {
-    print('🔄 FuelingService: Starting Firebase to offline sync...');
-
     if (!_authService.isLoggedIn.value || _authService.user.value == null) {
-      print('❌ User not logged in, skipping sync');
       fuelingRecords.clear();
       return;
     }
 
     final currentUserId = _authService.user.value!.uid;
-    print('👤 Syncing for user: $currentUserId');
-
     try {
-      print('🧹 Clearing existing data completely...');
       fuelingRecords.clear();
       await _clearOfflineDataOnly();
-
-      print('📥 Fetching fresh data from Firebase for current user...');
       await fetchFuelingRecords();
 
       // Verify all records belong to current user
       final wrongUserRecords =
           fuelingRecords.where((r) => r.userId != currentUserId).length;
       if (wrongUserRecords > 0) {
-        print(
-          '⚠️ WARNING: Found $wrongUserRecords records from other users - removing...',
-        );
         fuelingRecords.removeWhere((r) => r.userId != currentUserId);
       }
 
       // Force notify any listening controllers
-      print('🔄 Triggering reactive updates...');
       fuelingRecords.refresh();
-
-      print(
-        '✅ Firebase to offline sync completed successfully with ${fuelingRecords.length} records',
-      );
     } catch (e) {
-      print('❌ Error during Firebase to offline sync: $e');
       // Don't load offline data as fallback - keep it clean
       fuelingRecords.clear();
     }
@@ -777,19 +565,13 @@ class FuelingService extends GetxController {
       if (currentUserId.isNotEmpty) {
         final userSpecificKey = 'offline_fueling_records_$currentUserId';
         await prefs.remove(userSpecificKey);
-        print(
-          '✅ Cleared user-specific offline fueling records: $userSpecificKey',
-        );
       }
 
       // Also clear legacy global key for backward compatibility
       await prefs.remove('offline_fueling_records');
 
       fuelingRecords.clear();
-      print('✅ Offline fueling records cleared');
-    } catch (e) {
-      print('❌ Error clearing offline data: $e');
-    }
+    } catch (e) {}
   }
 
   // Check if there are pending operations
@@ -805,36 +587,22 @@ class FuelingService extends GetxController {
 
   // Debug method to test Firebase connection
   Future<void> testFirebaseConnection() async {
-    print('🔥 Testing Firebase connection...');
-
     try {
       // Test basic connectivity
-      print('🔗 Testing basic Firebase connectivity...');
       await _firestore.collection('test').doc('connection').get();
-      print('✅ Firebase connectivity test passed');
-
       // Test authentication
-      print('🔐 Checking authentication...');
       if (_authService.user.value == null) {
-        print('❌ No authenticated user');
         return;
       }
 
       final userId = _authService.user.value!.uid;
-      print('✅ Authenticated user: $userId');
-
       // Test read permissions
-      print('📖 Testing read permissions...');
-      final readTest =
-          await _firestore
-              .collection('fueling_records')
-              .where('userId', isEqualTo: userId)
-              .limit(1)
-              .get();
-      print('✅ Read permissions OK - found ${readTest.docs.length} documents');
-
+      await _firestore
+          .collection('fueling_records')
+          .where('userId', isEqualTo: userId)
+          .limit(1)
+          .get();
       // Test write permissions
-      print('✏️ Testing write permissions...');
       final writeTest = FuelingRecord(
         userId: userId,
         date: DateTime.now(),
@@ -848,49 +616,32 @@ class FuelingService extends GetxController {
       final docRef = await _firestore
           .collection('fueling_records')
           .add(writeTest.toMap());
-      print('✅ Write permissions OK - created document: ${docRef.id}');
-
       // Clean up test document
       await _firestore.collection('fueling_records').doc(docRef.id).delete();
-      print('✅ Test document cleaned up');
-
-      print('🎉 Firebase connection test completed successfully!');
-    } catch (e) {
-      print('❌ Firebase connection test FAILED: $e');
-      print('📝 Error type: ${e.runtimeType}');
-      print('📋 Error details: ${e.toString()}');
-    }
+    } catch (e) {}
   }
 
   // ========== GUEST MODE SUPPORT ==========
 
   /// Load guest data from local storage
   Future<void> _loadGuestData() async {
-    print('💾 Loading guest data from local storage...');
     try {
       final records = await _localStorageService.loadFuelingRecords();
       fuelingRecords.value = records;
-      print('✅ Loaded ${records.length} guest records');
     } catch (e) {
-      print('❌ Error loading guest data: $e');
       fuelingRecords.clear();
     }
   }
 
   /// Migrate guest data to Firebase when user logs in
   Future<void> migrateGuestDataToFirebase(String newUserId) async {
-    print('🔄 Migrating guest fueling data to Firebase...');
     try {
       // Load guest data
       final guestRecords = await _localStorageService.loadFuelingRecords();
 
       if (guestRecords.isEmpty) {
-        print('ℹ️ No guest fueling records to migrate');
         return;
       }
-
-      print('📤 Migrating ${guestRecords.length} guest records...');
-
       // Upload each record to Firebase with new user ID
       for (var record in guestRecords) {
         final newRecord = FuelingRecord(
@@ -905,17 +656,11 @@ class FuelingService extends GetxController {
 
         try {
           await _firestore.collection('fueling_records').add(newRecord.toMap());
-          print('✅ Migrated record from ${record.date}');
-        } catch (e) {
-          print('⚠️ Failed to migrate record: $e');
-        }
+        } catch (e) {}
       }
 
       // Clear guest data after migration
       await _localStorageService.clearFuelingRecords();
-      print('✅ Guest fueling data migration completed and cleared');
-    } catch (e) {
-      print('❌ Error migrating guest data: $e');
-    }
+    } catch (e) {}
   }
 }

@@ -24,9 +24,7 @@ class _NearbyStationsScreenState extends State<NearbyStationsScreen> {
   List<FuelStation> _stations = [];
   bool _isLoading = true;
   String? _error;
-  FuelStation? _selectedStation;
   String _loadingStatus = 'Initializing...';
-  bool _isFromCache = false;
 
   @override
   void initState() {
@@ -51,7 +49,6 @@ class _NearbyStationsScreenState extends State<NearbyStationsScreen> {
           .timeout(
             Duration(seconds: forceRefresh ? 40 : 35),
             onTimeout: () {
-              print('Location request timed out');
               return null;
             },
           );
@@ -94,7 +91,6 @@ class _NearbyStationsScreenState extends State<NearbyStationsScreen> {
         const Duration(seconds: 30),
         onTimeout: () {
           radiusTimer.cancel();
-          print('Station fetch timed out');
           throw Exception(
             'Request timed out. Please check your internet connection.',
           );
@@ -116,7 +112,6 @@ class _NearbyStationsScreenState extends State<NearbyStationsScreen> {
         });
       }
     } catch (e) {
-      print('Error loading stations: $e');
       setState(() {
         _error = 'Failed to load fuel stations:\n$e';
         _isLoading = false;
@@ -145,13 +140,10 @@ class _NearbyStationsScreenState extends State<NearbyStationsScreen> {
           geoUrl,
           mode: LaunchMode.externalApplication,
         );
-      } catch (e) {
-        print('Geo URL failed: $e');
-      }
+      } catch (e) {}
 
       // If geo: failed, try web URL
       if (!launched) {
-        print('Trying web URL...');
         launched = await launchUrl(
           webUrl,
           mode: LaunchMode.externalApplication,
@@ -162,7 +154,6 @@ class _NearbyStationsScreenState extends State<NearbyStationsScreen> {
         throw 'Could not launch Maps';
       }
     } catch (e) {
-      print('Error opening maps: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -175,10 +166,6 @@ class _NearbyStationsScreenState extends State<NearbyStationsScreen> {
   }
 
   void _showStationDetails(FuelStation station) {
-    setState(() {
-      _selectedStation = station;
-    });
-
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,

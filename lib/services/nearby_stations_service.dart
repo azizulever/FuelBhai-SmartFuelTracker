@@ -32,7 +32,6 @@ class NearbyStationsService {
     // Check if location services are enabled
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      print('Location services are disabled.');
       return null;
     }
 
@@ -41,13 +40,11 @@ class NearbyStationsService {
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
-        print('Location permissions are denied');
         return null;
       }
     }
 
     if (permission == LocationPermission.deniedForever) {
-      print('Location permissions are permanently denied');
       return null;
     }
 
@@ -77,57 +74,32 @@ class NearbyStationsService {
       }
 
       // Try to get current position first (more accurate)
-      print(
-        forceRefresh
-            ? 'Force refreshing GPS position...'
-            : 'Getting current GPS position...',
-      );
       Position? currentPosition;
       try {
         currentPosition = await Geolocator.getCurrentPosition(
           locationSettings: locationSettings,
         ).timeout(Duration(seconds: forceRefresh ? 30 : 15));
       } on TimeoutException {
-        print(
-          '⏱️ Current position timeout${forceRefresh ? " (even with extended timeout)" : ", trying last known..."}',
-        );
-      } catch (e) {
-        print(
-          'Error getting current position: $e${forceRefresh ? "" : ", trying last known..."}',
-        );
-      }
+      } catch (e) {}
 
       if (currentPosition != null) {
-        print(
-          '✓ Got current position: ${currentPosition.latitude}, ${currentPosition.longitude}',
-        );
         return currentPosition;
       }
 
       // If force refresh is enabled, don't use cached position
       if (forceRefresh) {
-        print('❌ Force refresh failed - could not get current GPS position');
         throw Exception(
           'Could not get fresh GPS position. Please ensure you are outdoors or near a window.',
         );
       }
 
       // Fallback to last known position
-      print('Attempting to get last known position...');
       final lastPosition = await Geolocator.getLastKnownPosition();
       if (lastPosition != null) {
-        print(
-          '✓ Using last known position: ${lastPosition.latitude}, ${lastPosition.longitude}',
-        );
-        final age = DateTime.now().difference(lastPosition.timestamp);
-        print('  (Position age: ${age.inMinutes} minutes)');
         return lastPosition;
       }
-
-      print('❌ No position available');
       throw Exception('Could not get location - please ensure GPS is enabled');
     } catch (e) {
-      print('❌ Error getting location: $e');
       return null;
     }
   }
@@ -142,7 +114,6 @@ class NearbyStationsService {
 
     // Check if cache expired
     if (DateTime.now().difference(_cacheTimestamp!) > _cacheDuration) {
-      print('Cache expired');
       return false;
     }
 
@@ -155,11 +126,8 @@ class NearbyStationsService {
     );
 
     if (moved > _minMovementDistance) {
-      print('User moved ${moved.toStringAsFixed(0)}m, refreshing');
       return false;
     }
-
-    print('Using cached data (moved ${moved.toStringAsFixed(0)}m)');
     return true;
   }
 
@@ -184,25 +152,16 @@ class NearbyStationsService {
 
     for (final radius in radii) {
       _currentRadius = radius;
-      print(
-        'Fetching fuel stations from Overpass API (radius: ${radius}km)...',
-      );
-
       stations = await _fetchStationsForRadius(userLocation, radius);
 
       if (stations.isNotEmpty) {
-        print('✓ Found ${stations.length} stations within ${radius}km');
         // Update cache
         _cachedStations = stations;
         _cacheTimestamp = DateTime.now();
         _lastFetchLocation = userLocation;
         return stations;
       }
-
-      print('No stations found in ${radius}km radius, trying larger radius...');
     }
-
-    print('❌ No fuel stations found even in 20km radius');
     return [];
   }
 
@@ -233,7 +192,6 @@ out center;
 
     for (final apiUrl in apiUrls) {
       try {
-        print('Trying: $apiUrl');
         final response = await http
             .post(
               Uri.parse(apiUrl),
@@ -252,7 +210,6 @@ out center;
                     try {
                       return FuelStation.fromOverpassJson(element);
                     } catch (e) {
-                      print('Error parsing station: $e');
                       return null;
                     }
                   })
@@ -270,25 +227,19 @@ out center;
           _cachedStations = stations;
           _cacheTimestamp = DateTime.now();
           _lastFetchLocation = userLocation;
-
-          print('✓ Found ${stations.length} fuel stations');
           return stations;
         } else {
-          print('API returned: ${response.statusCode}');
           lastError = Exception('API error: ${response.statusCode}');
         }
       } catch (e) {
-        print('Error with $apiUrl: $e');
         lastError = Exception(e.toString());
         continue; // Try next server
       }
     }
 
     // All servers failed
-    print('❌ All Overpass API servers failed');
     // Return cached data if available
     if (_cachedStations != null) {
-      print('Returning cached data due to error');
       return _cachedStations!;
     }
     throw lastError ?? Exception('Failed to fetch fuel stations');
@@ -299,6 +250,5 @@ out center;
     _cachedStations = null;
     _cacheTimestamp = null;
     _lastFetchLocation = null;
-    print('Cache cleared');
   }
 }

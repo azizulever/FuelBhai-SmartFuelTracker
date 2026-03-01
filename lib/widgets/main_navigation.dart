@@ -32,12 +32,9 @@ class _MainNavigationState extends State<MainNavigation> {
     // Try to find existing controller first, create if not found
     try {
       _mileageController = Get.find<MileageGetxController>();
-      print("MainNavigation found existing MileageController");
     } catch (e) {
       _mileageController = Get.put(MileageGetxController());
-      print("MainNavigation created new MileageController");
     }
-    print("MainNavigation initialized with index: $_currentIndex");
     // Log initial screen view
     _logCurrentTab();
   }
@@ -87,7 +84,6 @@ class _MainNavigationState extends State<MainNavigation> {
 
   @override
   Widget build(BuildContext context) {
-    print("Building MainNavigation with currentIndex: $_currentIndex");
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,

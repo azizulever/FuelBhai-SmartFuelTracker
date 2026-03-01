@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
-import 'package:mileage_calculator/screens/about_screen.dart';
 import 'package:mileage_calculator/screens/onboarding_screen.dart';
 import 'package:mileage_calculator/screens/privacy_policy_screen.dart';
 import 'package:mileage_calculator/screens/terms_conditions_screen.dart';
 import 'package:mileage_calculator/screens/contact_support_screen.dart';
 import 'package:mileage_calculator/screens/edit_name_screen.dart';
+import 'package:mileage_calculator/controllers/mileage_controller.dart';
 import 'package:mileage_calculator/services/auth_service.dart';
 import 'package:mileage_calculator/utils/theme.dart';
 import 'package:mileage_calculator/widgets/main_navigation.dart';
@@ -27,6 +28,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   String _userName = 'Guest User';
   String _userEmail = 'guest@fuelbhai.com';
   late final AuthService _authService;
+  bool _isGuest = false;
+  bool _isLinkingGoogle = false;
 
   @override
   void initState() {
@@ -47,22 +50,58 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       if (currentUser != null) {
         await currentUser.reload();
         setState(() {
+          _isGuest = false;
           _userName = currentUser.displayName ?? 'Guest User';
           _userEmail = currentUser.email ?? 'guest@fuelbhai.com';
         });
       } else {
         final prefs = await SharedPreferences.getInstance();
+        final isSkipped = prefs.getBool('skipped_login') ?? false;
         setState(() {
+          _isGuest = isSkipped;
           _userName = prefs.getString('user_name') ?? 'Guest User';
-          _userEmail = prefs.getString('user_email') ?? 'guest@fuelbhai.com';
+          _userEmail =
+              isSkipped
+                  ? 'Not signed in'
+                  : (prefs.getString('user_email') ?? 'guest@fuelbhai.com');
         });
       }
     } catch (e) {
-      print('Error loading user data: $e');
       setState(() {
         _userName = 'Guest User';
         _userEmail = 'guest@fuelbhai.com';
       });
+    }
+  }
+
+  Future<void> _signInWithGoogle() async {
+    setState(() => _isLinkingGoogle = true);
+
+    try {
+      final result = await _authService.signInWithGoogle();
+      if (result == 'Success') {
+        // Allow sync to complete
+        await Future.delayed(const Duration(milliseconds: 1000));
+
+        // Refresh controllers so data is visible immediately
+        try {
+          MileageGetxController mileageController;
+          try {
+            mileageController = Get.find<MileageGetxController>();
+          } catch (e) {
+            mileageController = Get.put(MileageGetxController());
+          }
+          await mileageController.refreshFromFuelingService();
+        } catch (_) {}
+
+        // Reload profile data
+        _loadUserData();
+      }
+    } catch (e) {
+    } finally {
+      if (mounted) {
+        setState(() => _isLinkingGoogle = false);
+      }
     }
   }
 
@@ -96,27 +135,52 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             const SizedBox(height: 32),
 
             // Profile Avatar
-            Container(
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: primaryColor, width: 3),
-              ),
-              child: ClipOval(
-                child: Icon(Icons.person, size: 60, color: primaryColor),
-              ),
+            Stack(
+              alignment: Alignment.bottomRight,
+              children: [
+                Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: _isGuest ? Colors.orange : primaryColor,
+                      width: 3,
+                    ),
+                  ),
+                  child: ClipOval(
+                    child: Icon(
+                      _isGuest ? Icons.person_outline : Icons.person,
+                      size: 60,
+                      color: _isGuest ? Colors.orange : primaryColor,
+                    ),
+                  ),
+                ),
+                if (_isGuest)
+                  Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Colors.orange,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.cloud_off_rounded,
+                      size: 18,
+                      color: Colors.white,
+                    ),
+                  ),
+              ],
             ),
 
             const SizedBox(height: 16),
 
             // User Name
             Text(
-              _userName,
-              style: const TextStyle(
+              _isGuest ? 'Guest User' : _userName,
+              style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.w600,
-                color: primaryColor,
+                color: _isGuest ? Colors.grey[700] : primaryColor,
               ),
             ),
 
@@ -125,29 +189,38 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             // User Email
             Text(
               _userEmail,
-              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+              style: TextStyle(
+                fontSize: 14,
+                color: _isGuest ? Colors.orange[700] : Colors.grey[600],
+              ),
             ),
 
-            const SizedBox(height: 40),
+            // Guest Mode Banner
+            if (_isGuest) ...[const SizedBox(height: 24), _buildGuestBanner()],
+
+            const SizedBox(height: 28),
 
             // Menu Items
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Column(
                 children: [
-                  _buildMenuItem(
-                    icon: Icons.edit_outlined,
-                    title: 'Edit Name',
-                    onTap: () async {
-                      final result = await Get.to(
-                        () => EditNameScreen(currentName: _userName),
-                      );
-                      if (result != null) {
-                        _loadUserData();
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 12),
+                  // Edit Name — only for signed-in users
+                  if (!_isGuest) ...[
+                    _buildMenuItem(
+                      icon: Icons.edit_outlined,
+                      title: 'Edit Name',
+                      onTap: () async {
+                        final result = await Get.to(
+                          () => EditNameScreen(currentName: _userName),
+                        );
+                        if (result != null) {
+                          _loadUserData();
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   _buildMenuItem(
                     icon: Icons.shield_outlined,
                     title: 'Privacy and Policy',
@@ -167,9 +240,10 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   ),
                   const SizedBox(height: 12),
                   _buildMenuItem(
-                    icon: Icons.logout_rounded,
-                    title: 'Logout',
-                    onTap: _showLogoutDialog,
+                    icon:
+                        _isGuest ? Icons.logout_rounded : Icons.logout_rounded,
+                    title: _isGuest ? 'Back to Login' : 'Logout',
+                    onTap: _isGuest ? _backToLogin : _showLogoutDialog,
                   ),
                 ],
               ),
@@ -179,6 +253,166 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  /// Guest mode banner with sign-in prompt
+  Widget _buildGuestBanner() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              primaryColor.withOpacity(0.05),
+              primaryColor.withOpacity(0.12),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: primaryColor.withOpacity(0.2), width: 1),
+        ),
+        child: Column(
+          children: [
+            // Warning icon & text
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.cloud_off_rounded,
+                    color: Colors.orange,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Your data is not backed up',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Sign in to sync your data to the cloud. Your existing records will be preserved.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey[600],
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 16),
+
+            // Sign in with Google button
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: _isLinkingGoogle ? null : _signInWithGoogle,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: Colors.black87,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: Colors.grey[300]!, width: 1.5),
+                  ),
+                ),
+                child:
+                    _isLinkingGoogle
+                        ? SizedBox(
+                          height: 22,
+                          width: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: Colors.grey[500],
+                          ),
+                        )
+                        : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            SvgPicture.asset(
+                              'assets/icons/google-icon.svg',
+                              height: 22,
+                              width: 22,
+                            ),
+                            const SizedBox(width: 12),
+                            const Text(
+                              'Continue with Google',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0.2,
+                              ),
+                            ),
+                          ],
+                        ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Navigate back to login/onboarding for guest users
+  void _backToLogin() {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: const Text('Go to Login'),
+            content: const Text(
+              'Your local data will be cleared. Are you sure you want to go back to login?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(color: Colors.grey[600]),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  Navigator.pop(context);
+                  await _authService.signOut();
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.remove('skipped_login');
+                  await prefs.remove('onboarding_completed');
+                  Get.offAll(() => const OnboardingScreen());
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
+                child: const Text(
+                  'Continue',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
+          ),
     );
   }
 

@@ -866,19 +866,6 @@ class _FuelEntryListState extends State<FuelEntryList> {
     );
   }
 
-  void _showEditTripDialog(BuildContext context, TripRecord trip) {
-    // TODO: Implement edit trip dialog
-    Get.snackbar(
-      'Coming Soon',
-      'Edit trip functionality will be available soon!',
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: primaryColor,
-      colorText: Colors.white,
-      margin: const EdgeInsets.all(16),
-      borderRadius: 8,
-    );
-  }
-
   void _showDeleteServiceConfirmation(
     BuildContext context,
     ServiceRecord service,

@@ -8,9 +8,6 @@ import 'package:mileage_calculator/services/service_trip_sync.dart';
 import 'package:mileage_calculator/services/local_storage_service.dart';
 import 'package:mileage_calculator/utils/theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:math';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 
 class AuthService extends GetxController {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -22,10 +19,11 @@ class AuthService extends GetxController {
   RxBool isGuestMode = false.obs;
   RxString guestUserId = ''.obs;
 
-  Rx<User?> user = Rx<User?>(null);
+  /// True while guest→Firebase migration is in progress.
+  /// Services should wait before fetching from Firebase.
+  bool isMigrating = false;
 
-  // Store verification data temporarily
-  final Map<String, Map<String, dynamic>> _verificationData = {};
+  Rx<User?> user = Rx<User?>(null);
 
   @override
   void onInit() {
@@ -33,16 +31,13 @@ class AuthService extends GetxController {
     user.value = _auth.currentUser;
     isLoggedIn.value = user.value != null;
 
-    // Check if user is in guest mode
     checkGuestMode();
 
-    // Listen for authentication state changes
     _auth.authStateChanges().listen((User? firebaseUser) {
       user.value = firebaseUser;
       isLoggedIn.value = firebaseUser != null;
 
       if (firebaseUser != null) {
-        // User logged in, disable guest mode
         isGuestMode.value = false;
       }
     });
@@ -55,492 +50,17 @@ class AuthService extends GetxController {
 
     if (isGuestMode.value) {
       guestUserId.value = await _localStorageService.getGuestUserId();
-      print('👤 Guest mode active with ID: ${guestUserId.value}');
-    }
-  }
-
-  Future<bool> registerWithEmail(
-    String email,
-    String password, {
-    String? name,
-  }) async {
-    try {
-      isLoading.value = true;
-
-      // Create user with email and password
-      UserCredential userCredential = await _auth
-          .createUserWithEmailAndPassword(email: email, password: password);
-
-      // Update display name
-      if (name != null && name.isNotEmpty) {
-        await userCredential.user?.updateDisplayName(name);
-      }
-
-      // Save user data locally
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('user_email', email);
-      await prefs.setString('user_name', name ?? 'User');
-
-      // Migrate guest data if in guest mode before syncing
-      if (isGuestMode.value) {
-        await _migrateGuestDataToFirebase();
-      }
-
-      // Trigger data sync after successful registration
-      await _syncDataAfterLogin();
-
-      Get.snackbar(
-        'Success',
-        'Account created successfully',
-        backgroundColor: primaryColor,
-        colorText: Colors.white,
-        borderRadius: 12,
-        margin: const EdgeInsets.all(16),
-        snackPosition: SnackPosition.TOP,
-        icon: const Icon(Icons.check_circle, color: Colors.white),
-        shouldIconPulse: false,
-        duration: const Duration(seconds: 3),
-      );
-
-      return true;
-    } on FirebaseAuthException catch (e) {
-      String errorMessage;
-
-      switch (e.code) {
-        case 'email-already-in-use':
-          errorMessage = 'This email is already registered.';
-          break;
-        case 'weak-password':
-          errorMessage = 'The password is too weak.';
-          break;
-        case 'invalid-email':
-          errorMessage = 'The email address is invalid.';
-          break;
-        default:
-          errorMessage = 'An error occurred during registration.';
-      }
-
-      Get.snackbar(
-        'Registration Error',
-        errorMessage,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-        borderRadius: 12,
-        margin: const EdgeInsets.all(16),
-        snackPosition: SnackPosition.TOP,
-      );
-
-      return false;
-    } catch (e) {
-      Get.snackbar(
-        'Registration Error',
-        'An unexpected error occurred during registration.',
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-        borderRadius: 12,
-        margin: const EdgeInsets.all(16),
-        snackPosition: SnackPosition.TOP,
-      );
-
-      return false;
-    } finally {
-      isLoading.value = false;
-    }
-  }
-
-  /// Send a 6-digit verification code to the provided email via Cloud Function
-  Future<String?> sendEmailVerificationCode(
-    String email,
-    String password,
-    String name,
-  ) async {
-    try {
-      isLoading.value = true;
-
-      // Generate a random 6-digit code
-      final random = Random();
-      final code = (100000 + random.nextInt(900000)).toString();
-
-      // Store the verification data temporarily
-      _verificationData[email] = {
-        'code': code,
-        'password': password,
-        'name': name,
-        'timestamp': DateTime.now().millisecondsSinceEpoch,
-      };
-
-      // Send email via Cloud Function
-      try {
-        // Replace with your actual Cloud Function URL
-        // Example: https://YOUR-REGION-YOUR-PROJECT-ID.cloudfunctions.net/sendVerificationEmail
-        final functionUrl = 'YOUR_CLOUD_FUNCTION_URL_HERE';
-
-        final response = await http.post(
-          Uri.parse(functionUrl),
-          headers: {'Content-Type': 'application/json'},
-          body: json.encode({'email': email, 'code': code, 'name': name}),
-        );
-
-        if (response.statusCode != 200) {
-          throw Exception('Failed to send email: ${response.body}');
-        }
-
-        Get.snackbar(
-          'Verification Code Sent',
-          'A 6-digit code has been sent to $email',
-          backgroundColor: primaryColor,
-          colorText: Colors.white,
-          borderRadius: 12,
-          margin: const EdgeInsets.all(16),
-          snackPosition: SnackPosition.TOP,
-          icon: const Icon(Icons.mail_outline, color: Colors.white),
-          shouldIconPulse: false,
-          duration: const Duration(seconds: 4),
-        );
-
-        return code;
-      } catch (emailError) {
-        print('❌ Email sending error: $emailError');
-        Get.snackbar(
-          'Error',
-          'Failed to send verification email. Please check your internet connection.',
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-          borderRadius: 12,
-          margin: const EdgeInsets.all(16),
-          snackPosition: SnackPosition.TOP,
-        );
-        return null;
-      }
-    } catch (e) {
-      Get.snackbar(
-        'Error',
-        'Failed to send verification code. Please try again.',
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-        borderRadius: 12,
-        margin: const EdgeInsets.all(16),
-        snackPosition: SnackPosition.TOP,
-      );
-      return null;
-    } finally {
-      isLoading.value = false;
-    }
-  }
-
-  /// Verify the email code and complete registration
-  Future<bool> verifyEmailCodeAndRegister(String email, String code) async {
-    try {
-      isLoading.value = true;
-
-      // Check if we have verification data for this email
-      if (!_verificationData.containsKey(email)) {
-        Get.snackbar(
-          'Error',
-          'No verification request found. Please request a new code.',
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-          borderRadius: 12,
-          margin: const EdgeInsets.all(16),
-          snackPosition: SnackPosition.TOP,
-        );
-        return false;
-      }
-
-      final data = _verificationData[email]!;
-      final storedCode = data['code'] as String;
-      final password = data['password'] as String;
-      final name = data['name'] as String;
-      final timestamp = data['timestamp'] as int;
-
-      // Check if code is expired (10 minutes)
-      final now = DateTime.now().millisecondsSinceEpoch;
-      if (now - timestamp > 600000) {
-        // 10 minutes in milliseconds
-        _verificationData.remove(email);
-        Get.snackbar(
-          'Code Expired',
-          'The verification code has expired. Please request a new one.',
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-          borderRadius: 12,
-          margin: const EdgeInsets.all(16),
-          snackPosition: SnackPosition.TOP,
-        );
-        return false;
-      }
-
-      // Verify the code
-      if (code != storedCode) {
-        Get.snackbar(
-          'Invalid Code',
-          'The verification code is incorrect. Please try again.',
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-          borderRadius: 12,
-          margin: const EdgeInsets.all(16),
-          snackPosition: SnackPosition.TOP,
-        );
-        return false;
-      }
-
-      // Code is correct, now create the user account
-      UserCredential userCredential = await _auth
-          .createUserWithEmailAndPassword(email: email, password: password);
-
-      // Update display name
-      if (name.isNotEmpty) {
-        await userCredential.user?.updateDisplayName(name);
-      }
-
-      // Remove verification data
-      _verificationData.remove(email);
-
-      // Sign out immediately after registration
-      await _auth.signOut();
-
-      Get.snackbar(
-        'Success',
-        'Email verified! Please sign in with your credentials.',
-        backgroundColor: const Color(0xFF10B981),
-        colorText: Colors.white,
-        borderRadius: 12,
-        margin: const EdgeInsets.all(16),
-        snackPosition: SnackPosition.TOP,
-        icon: const Icon(Icons.check_circle, color: Colors.white),
-        shouldIconPulse: false,
-        duration: const Duration(seconds: 3),
-      );
-
-      return true;
-    } on FirebaseAuthException catch (e) {
-      String errorMessage;
-
-      switch (e.code) {
-        case 'email-already-in-use':
-          errorMessage = 'This email is already registered.';
-          break;
-        case 'weak-password':
-          errorMessage = 'The password is too weak.';
-          break;
-        case 'invalid-email':
-          errorMessage = 'The email address is invalid.';
-          break;
-        default:
-          errorMessage = 'An error occurred during registration.';
-      }
-
-      Get.snackbar(
-        'Registration Error',
-        errorMessage,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-        borderRadius: 12,
-        margin: const EdgeInsets.all(16),
-        snackPosition: SnackPosition.TOP,
-      );
-
-      return false;
-    } catch (e) {
-      Get.snackbar(
-        'Error',
-        'An unexpected error occurred. Please try again.',
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-        borderRadius: 12,
-        margin: const EdgeInsets.all(16),
-        snackPosition: SnackPosition.TOP,
-      );
-
-      return false;
-    } finally {
-      isLoading.value = false;
-    }
-  }
-
-  /// Resend verification code
-  Future<String?> resendVerificationCode(String email) async {
-    try {
-      isLoading.value = true;
-
-      // Check if we have previous verification data
-      if (!_verificationData.containsKey(email)) {
-        Get.snackbar(
-          'Error',
-          'No previous verification request found.',
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-          borderRadius: 12,
-          margin: const EdgeInsets.all(16),
-          snackPosition: SnackPosition.TOP,
-        );
-        return null;
-      }
-
-      final data = _verificationData[email]!;
-      final password = data['password'] as String;
-      final name = data['name'] as String;
-
-      // Generate a new code
-      final random = Random();
-      final code = (100000 + random.nextInt(900000)).toString();
-
-      // Update verification data with new code and timestamp
-      _verificationData[email] = {
-        'code': code,
-        'password': password,
-        'name': name,
-        'timestamp': DateTime.now().millisecondsSinceEpoch,
-      };
-
-      // Send email via Cloud Function
-      try {
-        // Replace with your actual Cloud Function URL
-        final functionUrl = 'YOUR_CLOUD_FUNCTION_URL_HERE';
-
-        final response = await http.post(
-          Uri.parse(functionUrl),
-          headers: {'Content-Type': 'application/json'},
-          body: json.encode({'email': email, 'code': code, 'name': name}),
-        );
-
-        if (response.statusCode != 200) {
-          throw Exception('Failed to send email: ${response.body}');
-        }
-
-        Get.snackbar(
-          'Code Resent',
-          'A new 6-digit code has been sent to $email',
-          backgroundColor: primaryColor,
-          colorText: Colors.white,
-          borderRadius: 12,
-          margin: const EdgeInsets.all(16),
-          snackPosition: SnackPosition.TOP,
-          icon: const Icon(Icons.mail_outline, color: Colors.white),
-          shouldIconPulse: false,
-          duration: const Duration(seconds: 4),
-        );
-
-        return code;
-      } catch (emailError) {
-        print('❌ Email sending error: $emailError');
-        Get.snackbar(
-          'Error',
-          'Failed to send verification email. Please try again.',
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-          borderRadius: 12,
-          margin: const EdgeInsets.all(16),
-          snackPosition: SnackPosition.TOP,
-        );
-        return null;
-      }
-    } catch (e) {
-      Get.snackbar(
-        'Error',
-        'Failed to resend code. Please try again.',
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-        borderRadius: 12,
-        margin: const EdgeInsets.all(16),
-        snackPosition: SnackPosition.TOP,
-      );
-      return null;
-    } finally {
-      isLoading.value = false;
-    }
-  }
-
-  Future<bool> signInWithEmail(String email, String password) async {
-    try {
-      isLoading.value = true;
-
-      await _auth.signInWithEmailAndPassword(email: email, password: password);
-
-      // Get current user's display name or use email as fallback
-      String displayName =
-          _auth.currentUser?.displayName ??
-          _auth.currentUser?.email?.split('@')[0] ??
-          'User';
-
-      // Save user data locally
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('user_email', email);
-      await prefs.setString('user_name', displayName);
-
-      // Migrate guest data if in guest mode before syncing
-      if (isGuestMode.value) {
-        await _migrateGuestDataToFirebase();
-      }
-
-      // Trigger data sync after successful login
-      await _syncDataAfterLogin();
-
-      Get.snackbar(
-        'Success',
-        'Logged in successfully',
-        backgroundColor: primaryColor,
-        colorText: Colors.white,
-        borderRadius: 12,
-        margin: const EdgeInsets.all(16),
-        snackPosition: SnackPosition.TOP,
-        icon: const Icon(Icons.check_circle, color: Colors.white),
-        shouldIconPulse: false,
-        duration: const Duration(seconds: 3),
-      );
-
-      return true;
-    } on FirebaseAuthException catch (e) {
-      String errorMessage;
-
-      switch (e.code) {
-        case 'user-not-found':
-          errorMessage = 'No user found with this email.';
-          break;
-        case 'wrong-password':
-          errorMessage = 'Incorrect password.';
-          break;
-        case 'invalid-credential':
-          errorMessage = 'Invalid email or password.';
-          break;
-        case 'user-disabled':
-          errorMessage = 'This account has been disabled.';
-          break;
-        default:
-          errorMessage = 'An error occurred during login.';
-      }
-
-      Get.snackbar(
-        'Login Error',
-        errorMessage,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-        borderRadius: 12,
-        margin: const EdgeInsets.all(16),
-        snackPosition: SnackPosition.TOP,
-      );
-
-      return false;
-    } catch (e) {
-      Get.snackbar(
-        'Login Error',
-        'An unexpected error occurred during login.',
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-        borderRadius: 12,
-        margin: const EdgeInsets.all(16),
-        snackPosition: SnackPosition.TOP,
-      );
-
-      return false;
-    } finally {
-      isLoading.value = false;
     }
   }
 
   Future<String> signInWithGoogle() async {
     try {
       isLoading.value = true;
+
+      // ── Capture guest state BEFORE sign-in ──
+      // signInWithCredential triggers authStateChanges which sets
+      // isGuestMode = false, so we must snapshot the flag now.
+      final wasGuestMode = isGuestMode.value;
 
       // Sign out first to ensure clean state
       await GoogleSignIn().signOut();
@@ -555,11 +75,13 @@ class AuthService extends GetxController {
       final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
 
-      // Create credential with proper tokens
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
+
+      // Flag migration so services don't race with an early fetch
+      if (wasGuestMode) isMigrating = true;
 
       await FirebaseAuth.instance.signInWithCredential(credential);
 
@@ -568,9 +90,10 @@ class AuthService extends GetxController {
       await prefs.setString('user_email', googleUser.email);
       await prefs.setString('user_name', googleUser.displayName ?? 'User');
 
-      // Migrate guest data if in guest mode before syncing
-      if (isGuestMode.value) {
+      // Migrate guest data using the captured flag (not the reactive one)
+      if (wasGuestMode) {
         await _migrateGuestDataToFirebase();
+        isMigrating = false;
       }
 
       // Trigger data sync after successful login
@@ -589,12 +112,11 @@ class AuthService extends GetxController {
         duration: const Duration(seconds: 3),
       );
 
-      print('Successfully logged in');
       isLoading.value = false;
       return 'Success';
     } on FirebaseAuthException catch (e) {
       isLoading.value = false;
-      print('FirebaseAuthException: ${e.message}');
+      isMigrating = false;
       Get.snackbar(
         'Authentication Error',
         e.message ?? 'An unknown Firebase error occurred',
@@ -610,9 +132,8 @@ class AuthService extends GetxController {
       return 'FirebaseAuthException: ${e.message}';
     } on Exception catch (e) {
       isLoading.value = false;
-      print('Exception: $e');
+      isMigrating = false;
 
-      // Check for specific Google Sign-In errors
       String errorMessage = 'An unexpected error occurred';
       if (e.toString().contains('sign_in_failed') ||
           e.toString().contains('ApiException: 10')) {
@@ -640,158 +161,33 @@ class AuthService extends GetxController {
     }
   }
 
-  //
-  // Future<bool> signInWithGoogle() async {
-  //   try {
-  //     isLoading.value = true;
-  //
-  //     // Start the Google sign-in process
-  //     final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-  //
-  //     // If user canceled the sign-in
-  //     if (googleUser == null) {
-  //       isLoading.value = false;
-  //       return false;
-  //     }
-  //
-  //     // Obtain auth details from Google
-  //     final GoogleSignInAuthentication googleAuth =
-  //         await googleUser.authentication;
-  //
-  //     // Create Firebase credential with Google tokens
-  //     final OAuthCredential credential = GoogleAuthProvider.credential(
-  //       accessToken: googleAuth.accessToken,
-  //       idToken: googleAuth.idToken,
-  //     );
-  //     print('Google Auth Credintials: $credential');
-  //     // Sign in to Firebase with Google credential
-  //     final UserCredential userCredential = await _auth.signInWithCredential(
-  //       credential,
-  //     );
-  //
-  //     // Save user data locally
-  //     final prefs = await SharedPreferences.getInstance();
-  //     await prefs.setString('user_email', googleUser.email);
-  //     await prefs.setString(
-  //       'user_name',
-  //       googleUser.displayName ?? 'Google User',
-  //     );
-  //
-  //     Get.snackbar(
-  //       'Success',
-  //       'Signed in with Google successfully',
-  //       backgroundColor: primaryColor,
-  //       colorText: Colors.white,
-  //       borderRadius: 12,
-  //       margin: const EdgeInsets.all(16),
-  //       snackPosition: SnackPosition.TOP,
-  //       icon: const Icon(Icons.check_circle, color: Colors.white),
-  //       shouldIconPulse: false,
-  //       duration: const Duration(seconds: 3),
-  //     );
-  //
-  //     return true;
-  //   } catch (e) {
-  //     Get.snackbar(
-  //       'Google Sign-In Error',
-  //       'An error occurred during Google sign-in',
-  //       backgroundColor: Colors.red,
-  //       colorText: Colors.white,
-  //       borderRadius: 12,
-  //       margin: const EdgeInsets.all(16),
-  //       snackPosition: SnackPosition.TOP,
-  //     );
-  //
-  //     return false;
-  //   } finally {
-  //     isLoading.value = false;
-  //   }
-  // }
-
-  Future<void> sendPasswordResetEmail(String email) async {
-    try {
-      isLoading.value = true;
-
-      await _auth.sendPasswordResetEmail(email: email);
-
-      Get.snackbar(
-        'Success',
-        'Password reset email sent to $email',
-        backgroundColor: primaryColor,
-        colorText: Colors.white,
-        borderRadius: 12,
-        margin: const EdgeInsets.all(16),
-        snackPosition: SnackPosition.TOP,
-        icon: const Icon(Icons.check_circle, color: Colors.white),
-        shouldIconPulse: false,
-        duration: const Duration(seconds: 3),
-      );
-    } on FirebaseAuthException catch (e) {
-      String errorMessage;
-
-      switch (e.code) {
-        case 'user-not-found':
-          errorMessage = 'No user found with this email address.';
-          break;
-        case 'invalid-email':
-          errorMessage = 'The email address is invalid.';
-          break;
-        default:
-          errorMessage = 'An error occurred while sending reset email.';
-      }
-
-      Get.snackbar(
-        'Error',
-        errorMessage,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-        borderRadius: 12,
-        margin: const EdgeInsets.all(16),
-        snackPosition: SnackPosition.TOP,
-      );
-    } finally {
-      isLoading.value = false;
-    }
-  }
-
   Future<void> signOut() async {
     try {
-      // Get current user ID before signing out to clear user-specific data
       final currentUserId = getCurrentUserId();
 
-      // Clear fueling data first
+      // Clear fueling data
       try {
         final fuelingService = Get.find<FuelingService>();
         await fuelingService.clearAllLocalData();
-        print('✅ Fueling data cleared');
-      } catch (e) {
-        print('⚠️ Could not clear fueling data: $e');
-      }
+      } catch (_) {}
 
-      // Clear Service and Trip data
+      // Clear service and trip data
       try {
         final serviceTripSync = Get.find<ServiceTripSyncService>();
         await serviceTripSync.clearAllLocalData();
-        print('✅ Service and Trip data cleared');
-      } catch (e) {
-        print('⚠️ Could not clear service/trip data: $e');
-      }
+      } catch (_) {}
 
       // Clear user-specific local storage keys
       if (currentUserId.isNotEmpty) {
         final prefs = await SharedPreferences.getInstance();
-
-        // Clear all user-specific keys
         final keysToRemove = [
           'offline_fueling_records_$currentUserId',
           'pending_operations_$currentUserId',
           'service_records_$currentUserId',
           'trip_records_$currentUserId',
         ];
-
         for (var key in keysToRemove) {
           await prefs.remove(key);
-          print('🗑️ Removed: $key');
         }
       }
 
@@ -839,7 +235,6 @@ class AuthService extends GetxController {
     }
   }
 
-  // Helper method to get current user's data
   String getCurrentUserEmail() {
     return _auth.currentUser?.email ?? 'guest@fuelbhai.com';
   }
@@ -854,7 +249,6 @@ class AuthService extends GetxController {
     await prefs.setBool('skipped_login', true);
     isGuestMode.value = true;
     guestUserId.value = await _localStorageService.getGuestUserId();
-    print('✅ Guest mode enabled with ID: ${guestUserId.value}');
   }
 
   /// Disable guest mode
@@ -863,7 +257,6 @@ class AuthService extends GetxController {
     await prefs.remove('skipped_login');
     isGuestMode.value = false;
     guestUserId.value = '';
-    print('✅ Guest mode disabled');
   }
 
   /// Get current user ID (either Firebase user ID or guest ID)
@@ -879,146 +272,69 @@ class AuthService extends GetxController {
   /// Migrate guest data to Firebase when user logs in
   Future<void> _migrateGuestDataToFirebase() async {
     try {
-      print('🔄 Starting migration of guest data to Firebase...');
-
-      if (!isLoggedIn.value || user.value == null) {
-        print('❌ Cannot migrate: User not logged in');
-        return;
-      }
+      if (!isLoggedIn.value || user.value == null) return;
 
       final currentUserId = user.value!.uid;
 
-      // Get FuelingService and migrate data
       try {
         final fuelingService = Get.find<FuelingService>();
         await fuelingService.migrateGuestDataToFirebase(currentUserId);
-        print('✅ Fueling data migrated');
-      } catch (e) {
-        print('⚠️ Error migrating fueling data: $e');
-      }
+      } catch (_) {}
 
-      // Get ServiceTripSyncService and migrate data
       try {
         final serviceTripSync = Get.find<ServiceTripSyncService>();
         await serviceTripSync.migrateGuestDataToFirebase(currentUserId);
-        print('✅ Service and Trip data migrated');
-      } catch (e) {
-        print('⚠️ Error migrating service/trip data: $e');
-      }
+      } catch (_) {}
 
-      // Clear guest data after successful migration
       await _localStorageService.clearAllGuestData();
       await disableGuestMode();
-
-      print('✅ Guest data migration completed successfully');
-    } catch (e) {
-      print('❌ Error during guest data migration: $e');
-    }
+    } catch (_) {}
   }
 
-  // Method to sync data from Firebase to offline storage after successful login
+  /// Sync data from Firebase to offline storage after successful login
   Future<void> _syncDataAfterLogin() async {
     try {
-      print('🔄 AuthService: Starting data sync after login...');
-
-      // Wait a moment to ensure auth state is fully updated
       await Future.delayed(const Duration(milliseconds: 200));
 
       final currentUserId = user.value?.uid ?? '';
-      if (currentUserId.isEmpty) {
-        print('⚠️ No user ID available, skipping sync');
-        return;
-      }
+      if (currentUserId.isEmpty) return;
 
-      // Clear any cached local data to ensure fresh start
+      // Clear cached local data for fresh sync
       final prefs = await SharedPreferences.getInstance();
-      print('🗑️ Clearing old cached records for fresh sync...');
-
-      // Clear user-specific keys for service and trip records
       await prefs.remove('service_records_$currentUserId');
       await prefs.remove('trip_records_$currentUserId');
-
-      // Also clear legacy global keys for backward compatibility
       await prefs.remove('service_records');
       await prefs.remove('trip_records');
 
-      print('✅ Old cache cleared');
-
-      // Get FuelingService and trigger immediate sync
+      // Sync fueling records
       final fuelingService = Get.find<FuelingService>();
-
-      print(
-        '📥 Explicitly syncing fueling records from Firebase (bypassing delays)...',
-      );
       await fuelingService.syncFromFirebaseToOffline();
-      print(
-        '📊 After sync: ${fuelingService.fuelingRecords.length} fueling records loaded',
-      );
 
-      // Process any pending operations
       if (fuelingService.hasPendingOperations) {
-        print('📤 Processing pending fueling operations...');
         await fuelingService.syncPendingData();
       }
 
-      // Sync Service and Trip records from Firebase
+      // Sync service and trip records
       try {
         final serviceTripSync = Get.find<ServiceTripSyncService>();
-        print('📥 Syncing service and trip records from Firebase...');
         await serviceTripSync.syncFromFirebase();
-        print('✅ Service and Trip records synced successfully');
-      } catch (e) {
-        print(
-          '⚠️ ServiceTripSyncService not found, will be initialized when needed: $e',
-        );
-      }
+      } catch (_) {}
 
-      // Force refresh MileageController if it exists
+      // Refresh MileageController if it exists
       try {
-        print('🔄 Refreshing MileageController...');
         final mileageController = Get.find<MileageGetxController>();
         await Future.delayed(const Duration(milliseconds: 100));
         mileageController.update();
-        print('✅ MileageController refreshed');
-      } catch (e) {
-        print(
-          '⚠️ MileageController not found, will be initialized when needed: $e',
+      } catch (_) {}
+
+      // Validate user-specific data
+      if (fuelingService.fuelingRecords.isNotEmpty) {
+        fuelingService.fuelingRecords.removeWhere(
+          (record) => record.userId != currentUserId,
         );
       }
-
-      // Validate user-specific data after sync
-      print('🔍 Validating user-specific data...');
-      if (fuelingService.fuelingRecords.isNotEmpty) {
-        final currentUserId = user.value?.uid ?? '';
-        final userRecords =
-            fuelingService.fuelingRecords
-                .where((record) => record.userId == currentUserId)
-                .length;
-        final totalRecords = fuelingService.fuelingRecords.length;
-
-        if (userRecords == totalRecords) {
-          print(
-            '✅ Data validation passed: All $totalRecords fueling records belong to current user',
-          );
-        } else {
-          print(
-            '⚠️ Data validation warning: $userRecords/$totalRecords fueling records belong to current user',
-          );
-          // Clear mismatched data
-          fuelingService.fuelingRecords.removeWhere(
-            (record) => record.userId != currentUserId,
-          );
-          print(
-            '🧹 Removed ${totalRecords - userRecords} records from other users',
-          );
-        }
-      }
-
-      print('✅ Data sync completed successfully');
-      print('ℹ️ All user data synced from Firebase');
-    } catch (e) {
-      print('❌ Error during data sync after login: $e');
-      // Don't rethrow - login should still succeed even if sync fails
+    } catch (_) {
+      // Login should still succeed even if sync fails
     }
   }
 }

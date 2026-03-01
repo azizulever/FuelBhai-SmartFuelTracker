@@ -65,7 +65,6 @@ class TripNotificationService {
       );
 
       await androidPlugin.createNotificationChannel(channel);
-      print('✅ Notification channel created');
     }
   }
 
@@ -77,8 +76,7 @@ class TripNotificationService {
             >();
 
     if (androidPlugin != null) {
-      final granted = await androidPlugin.requestNotificationsPermission();
-      print('✅ Notification permission granted: $granted');
+      await androidPlugin.requestNotificationsPermission();
     }
 
     final iosPlugin =
@@ -104,7 +102,6 @@ class TripNotificationService {
     } else {
       // Open trip screen (navigate to tab index 3)
       // Note: This will be handled by the MainNavigation widget
-      print('Notification tapped - navigating to trip screen');
     }
   }
 
@@ -112,14 +109,11 @@ class TripNotificationService {
     try {
       final controller = Get.find<MileageGetxController>();
       controller.stopTrip();
-    } catch (e) {
-      print('Error stopping trip from notification: $e');
-    }
+    } catch (e) {}
   }
 
   void _showAddCostDialog() {
     // This navigates to trip screen where user can add costs
-    print('Add cost tapped - opening trip screen for cost entry');
   }
 
   Future<void> showTripNotification({
@@ -195,11 +189,6 @@ class TripNotificationService {
       android: androidDetails,
       iOS: iosDetails,
     );
-
-    print(
-      '📢 Showing trip notification - Duration: $durationText, Cost: ৳${totalCost.toStringAsFixed(2)}',
-    );
-
     try {
       await _notifications.show(
         _notificationId,
@@ -207,14 +196,10 @@ class TripNotificationService {
         'Duration: $durationText • Cost: ৳${totalCost.toStringAsFixed(2)}',
         details,
       );
-      print('✅ Notification shown successfully');
-    } catch (e) {
-      print('❌ Error showing notification: $e');
-    }
+    } catch (e) {}
   }
 
   Future<void> cancelTripNotification() async {
-    print('🔕 Cancelling trip notification');
     await _notifications.cancel(_notificationId);
   }
 

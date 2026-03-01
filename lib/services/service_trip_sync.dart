@@ -23,50 +23,43 @@ class ServiceTripSyncService extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    print('🚀 ServiceTripSyncService: Initializing...');
-
     try {
       _authService = Get.find<AuthService>();
-      print('✅ AuthService found');
     } catch (e) {
-      print('⚠️ AuthService not found, creating new instance');
       _authService = Get.put(AuthService());
     }
 
     // Load data based on auth state
     if (_authService.isLoggedIn.value) {
-      print(
-        '👤 User is logged in, fetching service/trip records from Firebase',
-      );
       serviceRecords.clear();
       tripRecords.clear();
       syncFromFirebase();
     } else if (_authService.isGuestMode.value) {
-      print('👤 Guest mode active, loading local service/trip data');
       serviceRecords.clear();
       tripRecords.clear();
       _loadGuestData();
     } else {
-      print('👤 User not logged in, ensuring empty state');
       serviceRecords.clear();
       tripRecords.clear();
     }
 
     // Listen for auth state changes
     _authService.isLoggedIn.listen((isLoggedIn) {
-      print('🔄 ServiceTripSync: Auth state changed: isLoggedIn = $isLoggedIn');
       if (isLoggedIn) {
-        print('✅ User logged in, fetching service/trip records from Firebase');
         serviceRecords.clear();
         tripRecords.clear();
-        Future.delayed(const Duration(milliseconds: 300), () {
+        // Wait for any guest→Firebase migration to finish before fetching
+        Future.delayed(const Duration(milliseconds: 500), () async {
+          // If migration is still running, wait for it
+          while (_authService.isMigrating) {
+            await Future.delayed(const Duration(milliseconds: 200));
+          }
           if (_authService.isLoggedIn.value &&
               _authService.user.value != null) {
             syncFromFirebase();
           }
         });
       } else {
-        print('❌ User logged out, clearing all service/trip data');
         serviceRecords.clear();
         tripRecords.clear();
         clearAllLocalData();
@@ -75,16 +68,12 @@ class ServiceTripSyncService extends GetxController {
 
     // Listen for guest mode changes
     _authService.isGuestMode.listen((isGuest) {
-      print('🔄 ServiceTripSync: Guest mode changed: isGuest = $isGuest');
       if (isGuest && !_authService.isLoggedIn.value) {
-        print('👤 Guest mode activated, loading local service/trip data');
         serviceRecords.clear();
         tripRecords.clear();
         _loadGuestData();
       }
     });
-
-    print('🎉 ServiceTripSyncService initialization completed');
   }
 
   // ========== SERVICE RECORDS ==========
@@ -95,12 +84,8 @@ class ServiceTripSyncService extends GetxController {
       String userId = _authService.user.value?.uid ?? '';
 
       if (userId.isEmpty) {
-        print('❌ User not logged in');
         return;
       }
-
-      print('🔄 Fetching service records for user: $userId');
-
       QuerySnapshot snapshot;
       try {
         // Try with orderBy first (requires composite index)
@@ -112,9 +97,6 @@ class ServiceTripSyncService extends GetxController {
                 .get();
       } catch (e) {
         // If index doesn't exist, query without orderBy and sort locally
-        print(
-          '⚠️ Composite index not found for service_records, querying without orderBy',
-        );
         snapshot =
             await _firestore
                 .collection('service_records')
@@ -133,9 +115,7 @@ class ServiceTripSyncService extends GetxController {
       serviceRecords.sort((a, b) => b.serviceDate.compareTo(a.serviceDate));
 
       await _saveServiceRecordsLocally();
-      print('✅ Fetched ${serviceRecords.length} service records');
     } catch (e) {
-      print('❌ Error fetching service records: $e');
       await _loadServiceRecordsLocally();
     } finally {
       isLoading.value = false;
@@ -148,7 +128,6 @@ class ServiceTripSyncService extends GetxController {
 
       // Check if user is in guest mode
       if (_authService.isGuestMode.value && !_authService.isLoggedIn.value) {
-        print('👤 Guest mode: Saving service record to local storage');
         final tempId = DateTime.now().millisecondsSinceEpoch.toString();
         final guestUserId = _authService.getCurrentUserId();
 
@@ -165,7 +144,6 @@ class ServiceTripSyncService extends GetxController {
         await _localStorageService.addServiceRecord(guestRecord);
         serviceRecords.insert(0, guestRecord);
         serviceRecords.sort((a, b) => b.serviceDate.compareTo(a.serviceDate));
-        print('✅ Guest service record saved locally');
         return;
       }
 
@@ -209,12 +187,8 @@ class ServiceTripSyncService extends GetxController {
           );
           await _saveServiceRecordsLocally();
         }
-        print('✅ Service record saved to Firebase: ${docRef.id}');
-      } catch (e) {
-        print('⚠️ Failed to sync to Firebase, saved locally: $e');
-      }
+      } catch (e) {}
     } catch (e) {
-      print('❌ Error adding service record: $e');
       throw e;
     } finally {
       isLoading.value = false;
@@ -227,10 +201,8 @@ class ServiceTripSyncService extends GetxController {
 
       // Check if user is in guest mode
       if (_authService.isGuestMode.value && !_authService.isLoggedIn.value) {
-        print('👤 Guest mode: Deleting service record from local storage');
         await _localStorageService.deleteServiceRecord(recordId);
         serviceRecords.removeWhere((r) => r.id == recordId);
-        print('✅ Guest service record deleted locally');
         return;
       }
 
@@ -241,12 +213,8 @@ class ServiceTripSyncService extends GetxController {
       try {
         // Delete from Firebase
         await _firestore.collection('service_records').doc(recordId).delete();
-        print('✅ Service record deleted from Firebase');
-      } catch (e) {
-        print('⚠️ Failed to delete from Firebase: $e');
-      }
+      } catch (e) {}
     } catch (e) {
-      print('❌ Error deleting service record: $e');
       throw e;
     } finally {
       isLoading.value = false;
@@ -257,7 +225,6 @@ class ServiceTripSyncService extends GetxController {
     try {
       final currentUserId = _authService.getCurrentUserId();
       if (currentUserId.isEmpty) {
-        print('⚠️ No user ID available, skipping service records save');
         return;
       }
 
@@ -268,19 +235,13 @@ class ServiceTripSyncService extends GetxController {
       // Use user-specific key for data isolation
       final userSpecificKey = 'service_records_$currentUserId';
       await prefs.setStringList(userSpecificKey, recordsJson);
-      print(
-        '✅ Saved ${recordsJson.length} service records for user: $currentUserId',
-      );
-    } catch (e) {
-      print('❌ Error saving service records: $e');
-    }
+    } catch (e) {}
   }
 
   Future<void> _loadServiceRecordsLocally() async {
     try {
       final currentUserId = _authService.getCurrentUserId();
       if (currentUserId.isEmpty) {
-        print('⚠️ No user ID available, skipping service records load');
         serviceRecords.clear();
         return;
       }
@@ -299,11 +260,7 @@ class ServiceTripSyncService extends GetxController {
         }
       }
       serviceRecords.sort((a, b) => b.serviceDate.compareTo(a.serviceDate));
-      print(
-        '✅ Loaded ${serviceRecords.length} service records for user: $currentUserId',
-      );
     } catch (e) {
-      print('❌ Error loading service records: $e');
       serviceRecords.clear();
     }
   }
@@ -317,13 +274,9 @@ class ServiceTripSyncService extends GetxController {
       String userId = _authService.user.value?.uid ?? '';
 
       if (userId.isEmpty) {
-        print('❌ User not logged in');
         isSyncing = false;
         return;
       }
-
-      print('🔄 Fetching trip records for user: $userId');
-
       QuerySnapshot snapshot;
       try {
         // Try with orderBy first (requires composite index)
@@ -335,9 +288,6 @@ class ServiceTripSyncService extends GetxController {
                 .get();
       } catch (e) {
         // If index doesn't exist, query without orderBy and sort locally
-        print(
-          '⚠️ Composite index not found for trip_records, querying without orderBy',
-        );
         snapshot =
             await _firestore
                 .collection('trip_records')
@@ -361,9 +311,7 @@ class ServiceTripSyncService extends GetxController {
       tripRecords.value = fetched;
 
       await _saveTripRecordsLocally();
-      print('✅ Fetched ${tripRecords.length} trip records');
     } catch (e) {
-      print('❌ Error fetching trip records: $e');
       isSyncing = false;
       await _loadTripRecordsLocally();
     } finally {
@@ -378,7 +326,6 @@ class ServiceTripSyncService extends GetxController {
 
       // Check if user is in guest mode
       if (_authService.isGuestMode.value && !_authService.isLoggedIn.value) {
-        print('👤 Guest mode: Saving trip record to local storage');
         final tempId = DateTime.now().millisecondsSinceEpoch.toString();
         final guestUserId = _authService.getCurrentUserId();
 
@@ -396,7 +343,6 @@ class ServiceTripSyncService extends GetxController {
         await _localStorageService.addTripRecord(guestRecord);
         tripRecords.insert(0, guestRecord);
         tripRecords.sort((a, b) => b.startTime.compareTo(a.startTime));
-        print('✅ Guest trip record saved locally');
         return;
       }
 
@@ -459,18 +405,11 @@ class ServiceTripSyncService extends GetxController {
                   .collection('trip_records')
                   .doc(docRef.id)
                   .update(firebaseRecord.toMap());
-              print('✅ Applied pending stop to Firebase trip: ${docRef.id}');
-            } catch (e) {
-              print('⚠️ Failed to apply pending stop to Firebase: $e');
-            }
+            } catch (e) {}
           }
         }
-        print('✅ Trip record saved to Firebase: ${docRef.id}');
-      } catch (e) {
-        print('⚠️ Failed to sync to Firebase, saved locally: $e');
-      }
+      } catch (e) {}
     } catch (e) {
-      print('❌ Error adding trip record: $e');
       throw e;
     } finally {
       isLoading.value = false;
@@ -483,14 +422,12 @@ class ServiceTripSyncService extends GetxController {
 
       // Check if user is in guest mode
       if (_authService.isGuestMode.value && !_authService.isLoggedIn.value) {
-        print('👤 Guest mode: Updating trip record in local storage');
         await _localStorageService.updateTripRecord(record);
 
         final index = tripRecords.indexWhere((r) => r.id == record.id);
         if (index != -1) {
           tripRecords[index] = record;
         }
-        print('✅ Guest trip record updated locally');
         return;
       }
 
@@ -507,12 +444,8 @@ class ServiceTripSyncService extends GetxController {
             .collection('trip_records')
             .doc(record.id)
             .update(record.toMap());
-        print('✅ Trip record updated in Firebase');
-      } catch (e) {
-        print('⚠️ Failed to update in Firebase: $e');
-      }
+      } catch (e) {}
     } catch (e) {
-      print('❌ Error updating trip record: $e');
       throw e;
     } finally {
       isLoading.value = false;
@@ -525,10 +458,8 @@ class ServiceTripSyncService extends GetxController {
 
       // Check if user is in guest mode
       if (_authService.isGuestMode.value && !_authService.isLoggedIn.value) {
-        print('👤 Guest mode: Deleting trip record from local storage');
         await _localStorageService.deleteTripRecord(recordId);
         tripRecords.removeWhere((r) => r.id == recordId);
-        print('✅ Guest trip record deleted locally');
         return;
       }
 
@@ -539,12 +470,8 @@ class ServiceTripSyncService extends GetxController {
       try {
         // Delete from Firebase
         await _firestore.collection('trip_records').doc(recordId).delete();
-        print('✅ Trip record deleted from Firebase');
-      } catch (e) {
-        print('⚠️ Failed to delete from Firebase: $e');
-      }
+      } catch (e) {}
     } catch (e) {
-      print('❌ Error deleting trip record: $e');
       throw e;
     } finally {
       isLoading.value = false;
@@ -555,7 +482,6 @@ class ServiceTripSyncService extends GetxController {
     try {
       final currentUserId = _authService.getCurrentUserId();
       if (currentUserId.isEmpty) {
-        print('⚠️ No user ID available, skipping trip records save');
         return;
       }
 
@@ -566,19 +492,13 @@ class ServiceTripSyncService extends GetxController {
       // Use user-specific key for data isolation
       final userSpecificKey = 'trip_records_$currentUserId';
       await prefs.setStringList(userSpecificKey, recordsJson);
-      print(
-        '✅ Saved ${recordsJson.length} trip records for user: $currentUserId',
-      );
-    } catch (e) {
-      print('❌ Error saving trip records: $e');
-    }
+    } catch (e) {}
   }
 
   Future<void> _loadTripRecordsLocally() async {
     try {
       final currentUserId = _authService.getCurrentUserId();
       if (currentUserId.isEmpty) {
-        print('⚠️ No user ID available, skipping trip records load');
         tripRecords.clear();
         return;
       }
@@ -597,11 +517,7 @@ class ServiceTripSyncService extends GetxController {
         }
       }
       tripRecords.sort((a, b) => b.startTime.compareTo(a.startTime));
-      print(
-        '✅ Loaded ${tripRecords.length} trip records for user: $currentUserId',
-      );
     } catch (e) {
-      print('❌ Error loading trip records: $e');
       tripRecords.clear();
     }
   }
@@ -609,21 +525,13 @@ class ServiceTripSyncService extends GetxController {
   // ========== SYNC METHODS ==========
 
   Future<void> syncFromFirebase() async {
-    print('🔄 Syncing Service and Trip records from Firebase...');
-
     try {
       // Fetch both service and trip records in parallel.
       // Each fetch function handles its own clear+assign atomically,
       // so we don't clear here (which would fire reactive listeners and
       // kill any in-progress trip).
       await Future.wait([fetchServiceRecords(), fetchTripRecords()]);
-
-      print('✅ Service and Trip sync completed');
-      print(
-        '📊 Service records: ${serviceRecords.length}, Trip records: ${tripRecords.length}',
-      );
     } catch (e) {
-      print('❌ Error during Service/Trip sync: $e');
       // Attempt to load from local cache as fallback
       await _loadServiceRecordsLocally();
       await _loadTripRecordsLocally();
@@ -642,33 +550,24 @@ class ServiceTripSyncService extends GetxController {
     if (currentUserId.isNotEmpty) {
       await prefs.remove('service_records_$currentUserId');
       await prefs.remove('trip_records_$currentUserId');
-      print('✅ Cleared user-specific service/trip data for: $currentUserId');
     }
 
     // Also clear legacy global keys for backward compatibility
     await prefs.remove('service_records');
     await prefs.remove('trip_records');
-
-    print('✅ Service and Trip local data cleared');
   }
 
   // ========== GUEST MODE SUPPORT ==========
 
   /// Load guest data from local storage
   Future<void> _loadGuestData() async {
-    print('💾 Loading guest service/trip data from local storage...');
     try {
       final services = await _localStorageService.loadServiceRecords();
       final trips = await _localStorageService.loadTripRecords();
 
       serviceRecords.value = services;
       tripRecords.value = trips;
-
-      print(
-        '✅ Loaded ${services.length} service records and ${trips.length} trip records for guest',
-      );
     } catch (e) {
-      print('❌ Error loading guest service/trip data: $e');
       serviceRecords.clear();
       tripRecords.clear();
     }
@@ -676,16 +575,10 @@ class ServiceTripSyncService extends GetxController {
 
   /// Migrate guest data to Firebase when user logs in
   Future<void> migrateGuestDataToFirebase(String newUserId) async {
-    print('🔄 Migrating guest service/trip data to Firebase...');
     try {
       // Load guest data
       final guestServices = await _localStorageService.loadServiceRecords();
       final guestTrips = await _localStorageService.loadTripRecords();
-
-      print(
-        '📤 Migrating ${guestServices.length} service records and ${guestTrips.length} trip records...',
-      );
-
       // Migrate service records
       for (var record in guestServices) {
         final newRecord = ServiceRecord(
@@ -700,10 +593,7 @@ class ServiceTripSyncService extends GetxController {
 
         try {
           await _firestore.collection('service_records').add(newRecord.toMap());
-          print('✅ Migrated service record from ${record.serviceDate}');
-        } catch (e) {
-          print('⚠️ Failed to migrate service record: $e');
-        }
+        } catch (e) {}
       }
 
       // Migrate trip records
@@ -721,18 +611,12 @@ class ServiceTripSyncService extends GetxController {
 
         try {
           await _firestore.collection('trip_records').add(newRecord.toMap());
-          print('✅ Migrated trip record from ${record.startTime}');
-        } catch (e) {
-          print('⚠️ Failed to migrate trip record: $e');
-        }
+        } catch (e) {}
       }
 
       // Clear guest data after migration
       await _localStorageService.clearServiceRecords();
       await _localStorageService.clearTripRecords();
-      print('✅ Guest service/trip data migration completed and cleared');
-    } catch (e) {
-      print('❌ Error migrating guest service/trip data: $e');
-    }
+    } catch (e) {}
   }
 }

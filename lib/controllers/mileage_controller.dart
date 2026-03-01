@@ -12,7 +12,7 @@ import 'package:mileage_calculator/services/trip_notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class MileageGetxController extends GetxController {
-  String _selectedVehicleType = 'Car';
+  String _selectedVehicleType = 'Bike';
   final List<String> _vehicleTypes = ['Car', 'Bike'];
   final List<FuelEntry> _fuelEntries = [];
   final List<ServiceRecord> _serviceRecords = [];
@@ -60,35 +60,20 @@ class MileageGetxController extends GetxController {
   void _initializeServices() {
     try {
       _fuelingService = Get.find<FuelingService>();
-      print('✅ MileageController: Found existing FuelingService');
     } catch (e) {
-      print(
-        '⚠️ MileageController: FuelingService not found, will be initialized by main',
-      );
       _fuelingService = Get.put(FuelingService());
-      print('✅ MileageController: Created new FuelingService');
     }
 
     try {
       _authService = Get.find<AuthService>();
-      print('✅ MileageController: Found existing AuthService');
     } catch (e) {
-      print(
-        '⚠️ MileageController: AuthService not found, creating new instance',
-      );
       _authService = Get.put(AuthService());
-      print('✅ MileageController: Created new AuthService');
     }
 
     try {
       _serviceTripSync = Get.find<ServiceTripSyncService>();
-      print('✅ MileageController: Found existing ServiceTripSyncService');
     } catch (e) {
-      print(
-        '⚠️ MileageController: ServiceTripSyncService not found, creating new instance',
-      );
       _serviceTripSync = Get.put(ServiceTripSyncService());
-      print('✅ MileageController: Created new ServiceTripSyncService');
     }
 
     // Initialize notification service
@@ -118,18 +103,15 @@ class MileageGetxController extends GetxController {
 
   Future<void> _initializeNotifications() async {
     await _notificationService.initialize();
-    print('✅ MileageController: Initialized TripNotificationService');
   }
 
   void _updateServiceRecordsFromSync() {
-    print('🔄 MileageController: Updating service records from sync service');
     _serviceRecords.clear();
     _serviceRecords.addAll(_serviceTripSync.serviceRecords);
     update();
   }
 
   void _updateTripRecordsFromSync() {
-    print('🔄 MileageController: Updating trip records from sync service');
     _tripRecords.clear();
     _tripRecords.addAll(_serviceTripSync.tripRecords);
 
@@ -153,9 +135,6 @@ class MileageGetxController extends GetxController {
         // Uses startTime (immutable) instead of trip ID (which changes
         // when Firebase assigns a document ID).
         if (_locallyStoppedTripStartTimes.contains(syncActiveTrip.startTime)) {
-          print(
-            '🚫 Ignoring stale sync isActive:true for locally stopped trip (startTime=${syncActiveTrip.startTime})',
-          );
           // Proactively push the stopped state back so subsequent listeners
           // see isActive:false without waiting for Firebase.
           final idx = _tripRecords.indexWhere((t) => t.id == syncActiveTrip.id);
@@ -175,7 +154,6 @@ class MileageGetxController extends GetxController {
             );
             _tripRecords[idx] = stoppedCopy;
             _serviceTripSync.updateTripRecord(stoppedCopy).catchError((e) {
-              print('⚠️ Failed to reconcile stopped trip in sync: $e');
             });
           }
         } else {
@@ -218,7 +196,7 @@ class MileageGetxController extends GetxController {
 
   Future<void> _loadSavedVehicleType() async {
     final prefs = await SharedPreferences.getInstance();
-    _selectedVehicleType = prefs.getString('selected_vehicle_type') ?? 'Car';
+    _selectedVehicleType = prefs.getString('selected_vehicle_type') ?? 'Bike';
     update();
   }
 
@@ -228,24 +206,17 @@ class MileageGetxController extends GetxController {
   }
 
   Future<void> _loadFuelEntries() async {
-    print('📥 MileageController: Loading fuel entries...');
-
     // CRITICAL: Always clear fuel entries on init
     // Never load from SharedPreferences - it may contain other users' data
     // Data will be populated via _updateFromFuelingService after Firebase sync
     _fuelEntries.clear();
 
     if (_authService.isLoggedIn.value && _authService.user.value != null) {
-      print(
-        '👤 User is logged in (${_authService.user.value!.uid}), will fetch from Firebase',
-      );
       // Data will be loaded via _updateFromFuelingService after Firebase sync
     } else if (_authService.isGuestMode.value) {
-      print('👤 Guest mode active, loading from FuelingService');
       // Trigger update from FuelingService for guest data
       _updateFromFuelingService();
     } else {
-      print('ℹ️ User not logged in, keeping empty state');
     }
 
     update();
@@ -265,27 +236,16 @@ class MileageGetxController extends GetxController {
   // All operations are now Firebase-first with automatic reactive updates
 
   Future<void> _syncWithFirebase() async {
-    print('🔄 MileageController: _syncWithFirebase called');
-    print('👤 User logged in: ${_authService.isLoggedIn.value}');
-
     // Don't auto-sync local entries to Firebase to prevent creating unwanted data
     // Only fetch data from Firebase that already exists for this user
     try {
-      print('📥 Fetching user-specific data from Firebase...');
       await _fuelingService.fetchFuelingRecords();
       await _serviceTripSync.syncFromFirebase();
-      print('✅ Firebase sync completed');
     } catch (e) {
-      print('❌ Sync failed: $e');
     }
   }
 
   void _updateFromFuelingService() {
-    print('🔄 MileageController: _updateFromFuelingService called');
-    print('📊 Fueling records count: ${_fuelingService.fuelingRecords.length}');
-    print('👤 User logged in: ${_authService.isLoggedIn.value}');
-    print('👤 Guest mode: ${_authService.isGuestMode.value}');
-
     // Always clear fuel entries first to prevent showing stale data
     _fuelEntries.clear();
 
@@ -293,10 +253,7 @@ class MileageGetxController extends GetxController {
     // Works for both authenticated users and guest mode
     if (_fuelingService.fuelingRecords.isNotEmpty) {
       final currentUserId = _authService.getCurrentUserId();
-      print('👤 Current user ID: $currentUserId');
-
       if (currentUserId.isEmpty) {
-        print('⚠️ No user ID available');
         update();
         return;
       }
@@ -306,11 +263,6 @@ class MileageGetxController extends GetxController {
           _fuelingService.fuelingRecords
               .where((record) => record.userId == currentUserId)
               .toList();
-
-      print(
-        '✅ Processing ${userRecords.length} fueling records for current user (filtered from ${_fuelingService.fuelingRecords.length} total)',
-      );
-
       for (var record in userRecords) {
         final fuelEntry = FuelEntry(
           id: record.id ?? '',
@@ -321,19 +273,12 @@ class MileageGetxController extends GetxController {
           vehicleType: _mapVehicleId(record.vehicleId),
         );
         _fuelEntries.add(fuelEntry);
-        print(
-          '➕ Added fuel entry: ${fuelEntry.vehicleType} - ${fuelEntry.fuelAmount}L',
-        );
       }
 
       _fuelEntries.sort((a, b) => b.date.compareTo(a.date));
-      print('✅ Sorted ${_fuelEntries.length} fuel entries');
-
       _saveFuelEntries();
       update();
-      print('🎉 UI updated with new fuel entries');
     } else {
-      print('ℹ️ No records to process');
       _saveFuelEntries();
       update();
     }
@@ -370,13 +315,10 @@ class MileageGetxController extends GetxController {
     String vehicleType,
     double fuelCost,
   ) async {
-    print('➕ MileageController: Adding fuel entry...');
-
     // Get current user ID (works for both authenticated and guest mode)
     final currentUserId = _authService.getCurrentUserId();
 
     if (currentUserId.isEmpty) {
-      print('❌ Cannot add fuel entry: No user ID available');
       return;
     }
 
@@ -390,15 +332,9 @@ class MileageGetxController extends GetxController {
         notes: 'Added from mobile app',
         vehicleId: vehicleType.toLowerCase(),
       );
-
-      print('📤 Adding fueling record with userId: ${fuelingRecord.userId}');
-      print('👤 Guest mode: ${_authService.isGuestMode.value}');
       await _fuelingService.addFuelingRecord(fuelingRecord);
-      print('✅ Fuel entry added successfully');
-
       // The UI will update automatically via _updateFromFuelingService listener
     } catch (e) {
-      print('❌ Failed to add fuel entry: $e');
       throw e;
     }
   }
@@ -410,13 +346,10 @@ class MileageGetxController extends GetxController {
     double fuelAmount,
     double fuelCost,
   ) async {
-    print('🔄 MileageController: Updating fuel entry...');
-
     // Get current user ID (works for both authenticated and guest mode)
     final currentUserId = _authService.getCurrentUserId();
 
     if (currentUserId.isEmpty) {
-      print('❌ Cannot update fuel entry: No user ID available');
       return;
     }
 
@@ -435,30 +368,19 @@ class MileageGetxController extends GetxController {
           notes: 'Updated from mobile app',
           vehicleId: vehicleType.toLowerCase(),
         );
-
-        print(
-          '📤 Updating fueling record with userId: ${fuelingRecord.userId}',
-        );
-        print('👤 Guest mode: ${_authService.isGuestMode.value}');
         await _fuelingService.updateFuelingRecord(fuelingRecord);
-        print('✅ Fuel entry updated successfully');
-
         // The UI will update automatically via _updateFromFuelingService listener
       } catch (e) {
-        print('❌ Failed to update fuel entry: $e');
         throw e;
       }
     }
   }
 
   void deleteEntry(int index) async {
-    print('🗑️ MileageController: Deleting fuel entry...');
-
     // Get current user ID (works for both authenticated and guest mode)
     final currentUserId = _authService.getCurrentUserId();
 
     if (currentUserId.isEmpty) {
-      print('❌ Cannot delete fuel entry: No user ID available');
       return;
     }
 
@@ -467,14 +389,9 @@ class MileageGetxController extends GetxController {
 
     if (originalIndex >= 0 && entryToDelete.id.isNotEmpty) {
       try {
-        print('📤 Deleting fueling record: ${entryToDelete.id}');
-        print('👤 Guest mode: ${_authService.isGuestMode.value}');
         await _fuelingService.deleteFuelingRecord(entryToDelete.id);
-        print('✅ Fuel entry deleted successfully');
-
         // The UI will update automatically via _updateFromFuelingService listener
       } catch (e) {
-        print('❌ Failed to delete fuel entry: $e');
         throw e;
       }
     }
@@ -484,7 +401,6 @@ class MileageGetxController extends GetxController {
   Future<void> syncData() async {
     if (!_authService.isLoggedIn.value) {
       // Silent failure - no snackbar notification
-      print('🔐 Sync skipped: User not logged in');
       return;
     }
 
@@ -641,28 +557,21 @@ class MileageGetxController extends GetxController {
   }
 
   Future<void> refreshData() async {
-    print('🔄 Manual refresh triggered');
     await _syncWithFirebase();
   }
 
   // Public method to manually refresh data from fueling service
   Future<void> refreshFromFuelingService() async {
-    print('🔄 MileageController: Manual refresh triggered');
-
     // Refresh fueling service data first
     if (_authService.isLoggedIn.value) {
-      print('📥 Fetching latest data from Firebase...');
       await _fuelingService.fetchFuelingRecords();
     }
 
     // Update from fueling service
     _updateFromFuelingService();
-
-    print('✅ Manual refresh completed');
   }
 
   void clearAllData() {
-    print('🧹 Clearing controller data...');
     _fuelEntries.clear();
     _saveFuelEntries();
     _serviceRecords.clear();
@@ -671,7 +580,6 @@ class MileageGetxController extends GetxController {
     _activeTrip = null;
     _locallyStoppedTripStartTimes.clear();
     _tripRecords.clear();
-    print('✅ Controller data cleared');
   }
 
   // Service Records Methods
@@ -695,7 +603,6 @@ class MileageGetxController extends GetxController {
     final currentUserId = _authService.getCurrentUserId();
 
     if (currentUserId.isEmpty) {
-      print('❌ Cannot add service record: No user ID available');
       return;
     }
 
@@ -710,20 +617,15 @@ class MileageGetxController extends GetxController {
     );
 
     try {
-      print('👤 Guest mode: ${_authService.isGuestMode.value}');
       await _serviceTripSync.addServiceRecord(newRecord);
-      print('✅ Service record added successfully');
     } catch (e) {
-      print('❌ Failed to add service record: $e');
     }
   }
 
   void deleteServiceRecord(String id) async {
     try {
       await _serviceTripSync.deleteServiceRecord(id);
-      print('✅ Service record deleted');
     } catch (e) {
-      print('❌ Failed to delete service record: $e');
     }
   }
 
@@ -780,7 +682,6 @@ class MileageGetxController extends GetxController {
     final currentUserId = _authService.getCurrentUserId();
 
     if (currentUserId.isEmpty) {
-      print('❌ Cannot start trip: No user ID available');
       return;
     }
 
@@ -809,17 +710,14 @@ class MileageGetxController extends GetxController {
           tripStartTime: newTrip.startTime,
         )
         .catchError((e) {
-          print('⚠️ Failed to show trip notification: $e');
         });
 
     // Fire-and-forget: sync to Firebase
     _serviceTripSync
         .addTripRecord(newTrip)
         .then((_) {
-          print('✅ Trip started and saved');
         })
         .catchError((e) {
-          print('⚠️ Trip started locally, sync failed: $e');
         });
   }
 
@@ -909,17 +807,14 @@ class MileageGetxController extends GetxController {
 
     // Cancel notification
     _notificationService.cancelTripNotification().catchError((e) {
-      print('⚠️ Failed to cancel notification: $e');
     });
 
     // Sync to Firebase
     _serviceTripSync
         .updateTripRecord(completedTrip)
         .then((_) {
-          print('✅ Trip stopped and synced to Firebase');
         })
         .catchError((e) {
-          print('⚠️ Trip stopped locally, sync failed: $e');
         });
   }
 
@@ -972,17 +867,14 @@ class MileageGetxController extends GetxController {
           tripStartTime: currentTrip.startTime,
         )
         .catchError((e) {
-          print('⚠️ Failed to update notification: $e');
         });
 
     // Fire-and-forget: sync to Firebase
     _serviceTripSync
         .updateTripRecord(currentTrip)
         .then((_) {
-          print('✅ Trip cost added and synced: ৳$amount');
         })
         .catchError((e) {
-          print('⚠️ Trip cost added locally, sync failed: $e');
         });
   }
 
@@ -1019,19 +911,15 @@ class MileageGetxController extends GetxController {
     _serviceTripSync
         .updateTripRecord(currentTrip)
         .then((_) {
-          print('✅ Trip cost entry deleted and synced');
         })
         .catchError((e) {
-          print('⚠️ Trip cost entry deleted locally, sync failed: $e');
         });
   }
 
   void deleteTripRecord(TripRecord trip) async {
     try {
       await _serviceTripSync.deleteTripRecord(trip.id);
-      print('✅ Trip record deleted');
     } catch (e) {
-      print('❌ Failed to delete trip record: $e');
     }
   }
 
